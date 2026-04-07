@@ -1,0 +1,84 @@
+import SwiftUI
+
+@Observable
+final class CaregiverPortalViewModel {
+    var appointments: [Booking] = []
+    var pendingRequests: [Booking] = []
+    var upcomingAppointments: [Booking] = []
+    var completedAppointments: [Booking] = []
+    var caregiverProfile: Caregiver?
+    var isLoading = false
+    var errorMessage: String?
+
+    var todayAppointmentCount: Int {
+        let calendar = Calendar.current
+        return appointments.filter { calendar.isDateInToday($0.date) && $0.status != .cancelled }.count
+    }
+
+    var totalEarnings: Double {
+        completedAppointments.reduce(0) { $0 + $1.totalCost }
+    }
+
+    func loadAppointments(caregiverId: String, firestoreService: FirestoreService) async {
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            appointments = try await firestoreService.fetchCaregiverBookings(for: caregiverId)
+            categorizeAppointments()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func categorizeAppointments() {
+        pendingRequests = appointments.filter { $0.status == .pending }
+        upcomingAppointments = appointments.filter { $0.status == .confirmed || $0.status == .inProgress }
+        completedAppointments = appointments.filter { $0.status == .completed }
+    }
+
+    func acceptBooking(bookingId: String, firestoreService: FirestoreService) async {
+        do {
+            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .confirmed)
+            if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
+                appointments[index].status = .confirmed
+            }
+            categorizeAppointments()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func rejectBooking(bookingId: String, firestoreService: FirestoreService) async {
+        do {
+            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
+            if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
+                appointments[index].status = .cancelled
+            }
+            categorizeAppointments()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func completeBooking(bookingId: String, firestoreService: FirestoreService) async {
+        do {
+            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .completed)
+            if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
+                appointments[index].status = .completed
+            }
+            categorizeAppointments()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateProfile(caregiver: Caregiver, firestoreService: FirestoreService) async {
+        do {
+            try await firestoreService.updateCaregiverProfile(caregiver)
+            caregiverProfile = caregiver
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
