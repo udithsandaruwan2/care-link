@@ -16,11 +16,12 @@ struct HomeView: View {
     @State private var bookingCaregiver: Caregiver?
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
+    @State private var showFilters = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
             VStack(spacing: 0) {
-                CLNavigationBar()
+                CLNavigationBar(filterAction: { showFilters = true })
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
@@ -90,6 +91,11 @@ struct HomeView: View {
             .onAppear { syncMainTabBarVisibility() }
             .onChange(of: showCaregiverProfile) { _, _ in syncMainTabBarVisibility() }
             .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
+        }
+        .sheet(isPresented: $showFilters) {
+            filterSheet
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
         }
     }
 
@@ -318,6 +324,65 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private var filterSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
+                VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                    Text("Sort by")
+                        .font(CLTheme.headlineFont)
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Picker("Sort by", selection: $viewModel.selectedSort) {
+                        ForEach(HomeViewModel.SortOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                    Toggle("Budget filter", isOn: $viewModel.budgetFilterEnabled)
+                        .tint(CLTheme.tealAccent)
+                        .font(CLTheme.calloutFont)
+
+                    if viewModel.budgetFilterEnabled {
+                        VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
+                            HStack {
+                                Text("Max hourly rate")
+                                    .font(CLTheme.calloutFont)
+                                    .foregroundStyle(CLTheme.textSecondary)
+                                Spacer()
+                                Text("$\(Int(viewModel.maxBudget))/hr")
+                                    .font(CLTheme.calloutFont.weight(.semibold))
+                                    .foregroundStyle(CLTheme.textPrimary)
+                            }
+                            Slider(value: $viewModel.maxBudget, in: 20...300, step: 5)
+                                .tint(CLTheme.accentBlue)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                HStack(spacing: CLTheme.spacingMD) {
+                    CLButton(title: "Reset", style: .outline) {
+                        viewModel.selectedSort = .recommended
+                        viewModel.budgetFilterEnabled = false
+                        viewModel.maxBudget = 120
+                        viewModel.applyFilters()
+                        showFilters = false
+                    }
+                    CLButton(title: "Apply", icon: "checkmark") {
+                        viewModel.applyFilters()
+                        showFilters = false
+                    }
+                }
+            }
+            .padding(CLTheme.spacingMD)
+            .navigationTitle("Caregiver Filters")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 

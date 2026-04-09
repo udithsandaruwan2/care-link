@@ -6,12 +6,13 @@ struct CaregiverMapView: View {
     @Binding var suppressMainTabBar: Bool
     @State private var viewModel = MapViewModel()
     @State private var showCaregiverProfile = false
+    @State private var searchDebounceTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
                 Map(position: $viewModel.cameraPosition) {
-                    ForEach(viewModel.caregivers) { caregiver in
+                    ForEach(viewModel.filteredCaregivers) { caregiver in
                         Annotation(
                             caregiver.name.components(separatedBy: " ").first ?? "",
                             coordinate: CLLocationCoordinate2D(
@@ -47,6 +48,15 @@ struct CaregiverMapView: View {
                             .padding(.bottom, emptyStateBottomInset)
                     }
                     .allowsHitTesting(false)
+                } else if !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            && viewModel.filteredCaregivers.isEmpty
+                            && !viewModel.isLoading {
+                    VStack {
+                        Spacer()
+                        noMatchesBanner
+                            .padding(.horizontal, CLTheme.spacingMD)
+                            .padding(.bottom, emptyStateBottomInset)
+                    }
                 }
             }
             .navigationTitle("Map")
@@ -60,6 +70,16 @@ struct CaregiverMapView: View {
             .task {
                 await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
                 appState.locationService.requestPermission()
+            }
+            .onChange(of: viewModel.searchText) { _, _ in
+                searchDebounceTask?.cancel()
+                searchDebounceTask = Task {
+                    try? await Task.sleep(for: .milliseconds(280))
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        viewModel.applySearch()
+                    }
+                }
             }
             .onAppear { syncMainTabBarVisibility() }
             .onChange(of: showCaregiverProfile) { _, _ in syncMainTabBarVisibility() }
@@ -109,27 +129,68 @@ struct CaregiverMapView: View {
     }
 
     private var searchOverlay: some View {
-        HStack(spacing: CLTheme.spacingSM) {
+        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
             HStack(spacing: CLTheme.spacingSM) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
-                    .foregroundStyle(CLTheme.textTertiary)
-                TextField("Search caregivers nearby...", text: $viewModel.searchText)
-                    .font(CLTheme.bodyFont)
-            }
-            .padding(.horizontal, CLTheme.spacingMD)
-            .frame(height: 48)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull))
-
-            Button {
-                if let coordinate = appState.locationService.userLocation {
-                    viewModel.centerOnUserLocation(coordinate)
+                HStack(spacing: CLTheme.spacingSM) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16))
+                        .foregroundStyle(CLTheme.textTertiary)
+                    TextField("Search by caregiver or specialty...", text: $viewModel.searchText)
+                        .font(CLTheme.bodyFont)
+                    if !viewModel.searchText.isEmpty {
+                        Button {
+                            viewModel.searchText = ""
+                            viewModel.applySearch()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(CLTheme.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-            } label: {
-                Image(systemName: "location.circle.fill")
-                    .font(.system(size: 38))
-                    .foregroundStyle(CLTheme.primaryNavy)
+                .padding(.horizontal, CLTheme.spacingMD)
+                .frame(height: 48)
+                .background(.regularMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull))
+
+                Button {
+                    if let coordinate = appState.locationService.userLocation {
+                        viewModel.centerOnUserLocation(coordinate)
+                    }
+                } label: {
+                    Image(systemName: "location.circle.fill")
+                        .font(.system(size: 38))
+                        .foregroundStyle(CLTheme.primaryNavy)
+                }
+            }
+
+            if !viewModel.specialtySuggestions.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: CLTheme.spacingSM) {
+                        if viewModel.selectedSpecialtyFilter != nil {
+                            Button {
+                                viewModel.selectSpecialtyFilter(nil)
+                            } label: {
+                                chip("All", selected: true)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        ForEach(viewModel.specialtySuggestions, id: \.self) { specialty in
+                            Button {
+                                if viewModel.selectedSpecialtyFilter == specialty {
+                                    viewModel.selectSpecialtyFilter(nil)
+                                } else {
+                                    viewModel.selectSpecialtyFilter(specialty)
+                                }
+                            } label: {
+                                chip(specialty, selected: viewModel.selectedSpecialtyFilter == specialty)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, CLTheme.spacingXS)
+                }
             }
         }
         .padding(.horizontal, CLTheme.spacingMD)
@@ -149,6 +210,39 @@ struct CaregiverMapView: View {
         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.bottom, CLTheme.spacingMD)
+    }
+
+    private var noMatchesBanner: some View {
+        HStack(spacing: CLTheme.spacingSM) {
+            Image(systemName: "magnifyingglass.circle")
+                .foregroundStyle(CLTheme.textTertiary)
+            Text("No matching caregivers. Try a different name or specialty.")
+                .font(CLTheme.calloutFont)
+                .foregroundStyle(CLTheme.textSecondary)
+            Spacer(minLength: 0)
+            Button("Reset") {
+                viewModel.searchText = ""
+                viewModel.selectSpecialtyFilter(nil)
+                viewModel.applySearch()
+            }
+            .font(CLTheme.captionFont.weight(.semibold))
+            .foregroundStyle(CLTheme.accentBlue)
+        }
+        .padding(CLTheme.spacingMD)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+        .padding(.horizontal, CLTheme.spacingMD)
+        .padding(.bottom, CLTheme.spacingMD)
+    }
+
+    private func chip(_ title: String, selected: Bool) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(selected ? .white : CLTheme.primaryNavy)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(selected ? AnyShapeStyle(CLTheme.primaryNavy) : AnyShapeStyle(.ultraThinMaterial))
+            .clipShape(Capsule())
     }
 
     private func caregiverDetailCard(_ caregiver: Caregiver) -> some View {

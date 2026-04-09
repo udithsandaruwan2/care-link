@@ -45,7 +45,7 @@ struct CLNavigationBar: View {
                 Button {
                     filterAction?()
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(CLTheme.textPrimary)
                         .frame(width: 40, height: 40)
@@ -53,6 +53,7 @@ struct CLNavigationBar: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open filters")
             }
         }
         .padding(.horizontal, CLTheme.spacingMD)
