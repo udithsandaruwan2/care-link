@@ -81,7 +81,9 @@ final class ChatService {
             senderName: senderName,
             text: text,
             sentAt: Date(),
-            isRead: false
+            isRead: false,
+            kind: .text,
+            bookingId: nil
         )
 
         let data = try Firestore.Encoder().encode(message)
@@ -93,6 +95,40 @@ final class ChatService {
 
         try await db.collection("conversations").document(conversationId).updateData([
             "lastMessage": text,
+            "lastMessageAt": Timestamp(date: Date())
+        ])
+    }
+
+    /// Sends a structured booking request bubble (caregiver can accept/decline from chat).
+    func sendBookingRequestMessage(
+        conversationId: String,
+        senderId: String,
+        senderName: String,
+        booking: Booking
+    ) async throws {
+        let messageId = UUID().uuidString
+        let preview = "📅 Booking: \(booking.date.formatted(date: .abbreviated, time: .omitted)) · $\(String(format: "%.0f", booking.totalCost))"
+        let message = ChatMessage(
+            id: messageId,
+            conversationId: conversationId,
+            senderId: senderId,
+            senderName: senderName,
+            text: preview,
+            sentAt: Date(),
+            isRead: false,
+            kind: .bookingRequest,
+            bookingId: booking.id
+        )
+
+        let data = try Firestore.Encoder().encode(message)
+        try await db.collection("conversations")
+            .document(conversationId)
+            .collection("messages")
+            .document(messageId)
+            .setData(data)
+
+        try await db.collection("conversations").document(conversationId).updateData([
+            "lastMessage": preview,
             "lastMessageAt": Timestamp(date: Date())
         ])
     }

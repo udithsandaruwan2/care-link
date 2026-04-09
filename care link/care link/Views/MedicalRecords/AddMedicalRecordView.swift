@@ -37,7 +37,7 @@ struct AddMedicalRecordView: View {
                                     .padding(.vertical, 12)
                                     .foregroundStyle(selectedType == type ? .white : Color(hex: type.colorHex))
                                     .background(selectedType == type ? Color(hex: type.colorHex) : Color(hex: type.colorHex).opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                                    .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
                                 }
                             }
                         }
@@ -62,7 +62,7 @@ struct AddMedicalRecordView: View {
                                 .frame(minHeight: 100)
                                 .padding(CLTheme.spacingSM)
                                 .background(CLTheme.backgroundSecondary)
-                                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                                .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
                         }
 
                         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
@@ -126,7 +126,7 @@ struct AddMedicalRecordView: View {
         }
         .padding(CLTheme.spacingMD)
         .background(CLTheme.lightBlue)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
@@ -142,8 +142,8 @@ struct AddMedicalRecordView: View {
             }
             .padding(CLTheme.spacingMD)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-            .shadow(color: CLTheme.shadowLight, radius: 4)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            .shadow(color: CLTheme.shadowLight, radius: 6, y: 2)
             .padding(.horizontal, CLTheme.spacingMD)
         }
     }

@@ -4,22 +4,22 @@ extension View {
     func clCardStyle() -> some View {
         self
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-            .shadow(color: CLTheme.shadowLight, radius: 8, x: 0, y: 2)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            .shadow(color: CLTheme.shadowLight, radius: 10, x: 0, y: 3)
     }
 
     func clGlassStyle() -> some View {
         self
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
     }
 
     func clSectionStyle() -> some View {
         self
             .padding(CLTheme.spacingMD)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-            .shadow(color: CLTheme.shadowLight, radius: 4, x: 0, y: 1)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            .shadow(color: CLTheme.shadowLight, radius: 6, x: 0, y: 2)
     }
 
     func shimmerEffect(_ isLoading: Bool) -> some View {

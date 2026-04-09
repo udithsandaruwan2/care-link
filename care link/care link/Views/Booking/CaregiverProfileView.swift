@@ -13,22 +13,25 @@ struct CaregiverProfileView: View {
     @State private var chatConversation: ChatConversation?
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: CLTheme.spacingLG) {
-                    profileHeader
-                    connectionStatusBanner
-                    statsRow
-                    experienceSection
-                    skillsSection
-                    reviewsSection
-                }
-                .padding(.bottom, 120)
+        ScrollView {
+            VStack(spacing: CLTheme.spacingLG) {
+                profileHeader
+                connectionStatusBanner
+                statsRow
+                experienceSection
+                skillsSection
+                reviewsSection
             }
-
-            bottomBar
+            .padding(.bottom, CLTheme.spacingMD)
         }
         .background(CLTheme.backgroundPrimary)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                bottomBar
+            }
+            .background(.ultraThinMaterial)
+        }
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -277,8 +280,8 @@ struct CaregiverProfileView: View {
     // MARK: - Bottom Bar
 
     private var bottomBar: some View {
-        VStack(spacing: CLTheme.spacingSM) {
-            if existingConnection?.status == .approved {
+        VStack(spacing: CLTheme.spacingMD) {
+            if appState.currentUserRole == .user {
                 HStack(spacing: CLTheme.spacingMD) {
                     Button {
                         openChat()
@@ -300,7 +303,7 @@ struct CaregiverProfileView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "calendar.badge.plus")
-                            Text("Book Now")
+                            Text("Book")
                                 .font(CLTheme.headlineFont)
                         }
                         .foregroundStyle(.white)
@@ -310,56 +313,57 @@ struct CaregiverProfileView: View {
                         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
                     }
                 }
-            } else if existingConnection?.status == .pending {
-                HStack {
-                    Image(systemName: "clock.fill")
-                    Text("Connection Request Pending")
-                        .font(CLTheme.headlineFont)
-                }
-                .foregroundStyle(CLTheme.warningOrange)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(CLTheme.warningOrange.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+
+                connectionHelperRow
             } else {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("HOURLY RATE")
-                            .font(CLTheme.smallFont)
-                            .foregroundStyle(CLTheme.textTertiary)
-                            .tracking(0.5)
-                        Text("$\(String(format: "%.0f", caregiver.hourlyRate))/hr")
-                            .font(CLTheme.titleFont)
-                            .foregroundStyle(CLTheme.textPrimary)
-                    }
-
-                    Spacer()
-
-                    Button {
-                        requestConnection()
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isRequestingConnection {
-                                ProgressView().tint(.white)
-                            } else {
-                                Image(systemName: "person.badge.plus")
-                                Text("Request Connection")
-                                    .font(CLTheme.headlineFont)
-                            }
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
-                        .background(CLTheme.gradientBlue)
-                        .clipShape(Capsule())
-                    }
-                    .disabled(isRequestingConnection)
-                }
+                Text("Switch to a patient account to book caregivers.")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+                    .multilineTextAlignment(.center)
             }
         }
         .padding(.horizontal, CLTheme.spacingLG)
-        .padding(.vertical, CLTheme.spacingMD)
-        .background(CLTheme.cardBackground.shadow(color: CLTheme.shadowMedium, radius: 12, x: 0, y: -4))
+        .padding(.top, CLTheme.spacingMD)
+        .padding(.bottom, CLTheme.spacingSM)
+    }
+
+    @ViewBuilder
+    private var connectionHelperRow: some View {
+        if existingConnection == nil {
+            Button {
+                requestConnection()
+            } label: {
+                HStack(spacing: 6) {
+                    if isRequestingConnection {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "person.badge.plus")
+                        Text("Request connection for ongoing care")
+                            .font(CLTheme.calloutFont)
+                    }
+                }
+                .foregroundStyle(CLTheme.accentBlue)
+                .frame(maxWidth: .infinity)
+            }
+            .disabled(isRequestingConnection)
+        } else if existingConnection?.status == .pending {
+            HStack {
+                Image(systemName: "clock.fill")
+                Text("Connection request pending approval")
+                    .font(CLTheme.calloutFont)
+            }
+            .foregroundStyle(CLTheme.warningOrange)
+            .frame(maxWidth: .infinity)
+        } else if existingConnection?.status == .approved {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(CLTheme.successGreen)
+                Text("Connected for ongoing care")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 
     // MARK: - Actions

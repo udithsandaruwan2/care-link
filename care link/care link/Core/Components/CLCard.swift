@@ -11,8 +11,8 @@ struct CLCard<Content: View>: View {
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(CLTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-        .shadow(color: CLTheme.shadowLight, radius: 8, x: 0, y: 2)
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+        .shadow(color: CLTheme.shadowLight, radius: 10, x: 0, y: 3)
     }
 }
 
@@ -37,8 +37,8 @@ struct CLInfoCard: View {
         .padding(CLTheme.spacingMD)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(CLTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
-        .shadow(color: CLTheme.shadowLight, radius: 4, x: 0, y: 1)
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
+        .shadow(color: CLTheme.shadowLight, radius: 6, x: 0, y: 2)
     }
 }
 

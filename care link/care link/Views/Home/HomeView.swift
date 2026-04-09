@@ -3,6 +3,7 @@ import FirebaseAuth
 
 struct HomeView: View {
     @Environment(AppState.self) private var appState
+    @Binding var suppressMainTabBar: Bool
     @State private var viewModel = HomeViewModel()
     @State private var selectedCaregiver: Caregiver?
     @State private var showCaregiverProfile = false
@@ -10,6 +11,9 @@ struct HomeView: View {
 
     @State private var activeConnection: Connection?
     @State private var connectedCaregiver: Caregiver?
+    /// Shown when the user has an accepted booking (even without a separate “connection”).
+    @State private var activeBooking: Booking?
+    @State private var bookingCaregiver: Caregiver?
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
 
@@ -65,12 +69,21 @@ struct HomeView: View {
             .task {
                 await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
                 await loadActiveConnection()
+                await loadActiveBookingCard()
             }
             .onChange(of: appState.navigationResetToken) { _, _ in
                 navigationPath = NavigationPath()
                 showCaregiverProfile = false
+                syncMainTabBarVisibility()
             }
+            .onAppear { syncMainTabBarVisibility() }
+            .onChange(of: showCaregiverProfile) { _, _ in syncMainTabBarVisibility() }
+            .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
         }
+    }
+
+    private func syncMainTabBarVisibility() {
+        suppressMainTabBar = showCaregiverProfile || showChat
     }
 
     // MARK: - Greeting
@@ -93,18 +106,30 @@ struct HomeView: View {
 
     // MARK: - Your Caregiver Card
 
+    private var heroCaregiver: Caregiver? {
+        bookingCaregiver ?? connectedCaregiver
+    }
+
+    private var heroBooking: Booking? {
+        activeBooking
+    }
+
+    private var heroConnection: Connection? {
+        activeConnection
+    }
+
     @ViewBuilder
     private var yourCaregiverCard: some View {
-        if let caregiver = connectedCaregiver, let connection = activeConnection {
+        if let caregiver = heroCaregiver {
             VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
                 HStack {
-                    Text("Your Caregiver")
+                    Text(heroBooking != nil ? "Your booked caregiver" : "Your Caregiver")
                         .font(CLTheme.title2Font)
                         .foregroundStyle(CLTheme.textPrimary)
                     Spacer()
                     HStack(spacing: 4) {
                         Circle().fill(CLTheme.successGreen).frame(width: 8, height: 8)
-                        Text("Connected")
+                        Text(heroBooking != nil ? "Confirmed" : "Connected")
                             .font(CLTheme.captionFont)
                             .foregroundStyle(CLTheme.successGreen)
                     }
@@ -112,6 +137,21 @@ struct HomeView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
                 VStack(spacing: 0) {
+                    if let b = heroBooking {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 12))
+                            Text("\(b.date.formatted(date: .abbreviated, time: .omitted)) · \(b.startTime.formatted(date: .omitted, time: .shortened)) – \(b.endTime.formatted(date: .omitted, time: .shortened))")
+                                .font(CLTheme.captionFont)
+                            Spacer()
+                            Text("$\(String(format: "%.0f", b.totalCost))")
+                                .font(CLTheme.calloutFont)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(.white.opacity(0.9))
+                        .padding(.bottom, CLTheme.spacingSM)
+                    }
+
                     HStack(spacing: CLTheme.spacingMD) {
                         CaregiverAvatar(size: 65, imageURL: caregiver.imageURL, showVerified: caregiver.isVerified)
 
@@ -141,7 +181,11 @@ struct HomeView: View {
 
                     HStack(spacing: CLTheme.spacingMD) {
                         Button {
-                            openChatWithCaregiver(caregiver, connection: connection)
+                            if let conn = heroConnection {
+                                openChatWithCaregiver(caregiver, connection: conn)
+                            } else {
+                                openChatWithCaregiverUnconnected(caregiver)
+                            }
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "message.fill")
@@ -151,10 +195,11 @@ struct HomeView: View {
                             }
                             .foregroundStyle(CLTheme.primaryNavy)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 12)
                             .background(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                            .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
 
                         Button {
                             selectedCaregiver = caregiver
@@ -163,15 +208,20 @@ struct HomeView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "calendar.badge.plus")
                                     .font(.system(size: 14))
-                                Text("Book Session")
+                                Text(heroBooking != nil ? "Details" : "Book Session")
                                     .font(CLTheme.calloutFont)
                             }
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(.white.opacity(0.2))
-                            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                            .padding(.vertical, 12)
+                            .background(.white.opacity(0.22))
+                            .clipShape(Capsule())
+                            .overlay {
+                                Capsule()
+                                    .stroke(.white.opacity(0.35), lineWidth: 1)
+                            }
                         }
+                        .buttonStyle(.plain)
                     }
                     .padding(.top, CLTheme.spacingMD)
                 }
@@ -183,8 +233,8 @@ struct HomeView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL))
-                .shadow(color: CLTheme.primaryNavy.opacity(0.3), radius: 12, y: 6)
+                .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusXL))
+                .shadow(color: CLTheme.primaryNavy.opacity(0.3), radius: 14, y: 6)
                 .padding(.horizontal, CLTheme.spacingMD)
             }
         }
@@ -216,8 +266,8 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, CLTheme.spacingMD)
         .background(CLTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-        .shadow(color: CLTheme.shadowLight, radius: 4)
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+        .shadow(color: CLTheme.shadowLight, radius: 6, y: 2)
     }
 
     // MARK: - Search & Filter
@@ -234,9 +284,13 @@ struct HomeView: View {
                 }
         }
         .padding(.horizontal, CLTheme.spacingMD)
-        .frame(height: 48)
+        .frame(height: 50)
         .background(CLTheme.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+        .clipShape(Capsule())
+        .overlay {
+            Capsule()
+                .stroke(CLTheme.divider.opacity(0.55), lineWidth: 1)
+        }
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
@@ -321,7 +375,7 @@ struct HomeView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL))
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusXL))
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
@@ -332,13 +386,13 @@ struct HomeView: View {
                     .fill(CLTheme.backgroundSecondary)
                     .frame(width: 60, height: 60)
                 VStack(alignment: .leading, spacing: 6) {
-                    RoundedRectangle(cornerRadius: 4)
+                    CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusSM)
                         .fill(CLTheme.backgroundSecondary)
                         .frame(width: 120, height: 14)
-                    RoundedRectangle(cornerRadius: 4)
+                    CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusSM)
                         .fill(CLTheme.backgroundSecondary)
                         .frame(width: 80, height: 12)
-                    RoundedRectangle(cornerRadius: 4)
+                    CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusSM)
                         .fill(CLTheme.backgroundSecondary)
                         .frame(width: 160, height: 12)
                 }
@@ -355,6 +409,22 @@ struct HomeView: View {
         activeConnection = try? await appState.firestoreService.fetchActiveConnectionForUser(userId)
         if let conn = activeConnection {
             connectedCaregiver = try? await appState.firestoreService.fetchCaregiver(id: conn.caregiverId)
+        } else {
+            connectedCaregiver = nil
+        }
+    }
+
+    /// Latest confirmed / in-progress booking drives the home hero when present.
+    private func loadActiveBookingCard() async {
+        let userId = appState.authService.currentUser?.uid ?? ""
+        guard !userId.isEmpty else { return }
+        let list = (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
+        let match = list.first { $0.status == .confirmed || $0.status == .inProgress }
+        activeBooking = match
+        if let b = match {
+            bookingCaregiver = try? await appState.firestoreService.fetchCaregiver(id: b.caregiverId)
+        } else {
+            bookingCaregiver = nil
         }
     }
 
@@ -373,9 +443,25 @@ struct HomeView: View {
             showChat = true
         }
     }
+
+    private func openChatWithCaregiverUnconnected(_ caregiver: Caregiver) {
+        Task {
+            let userId = appState.authService.currentUser?.uid ?? ""
+            let userName = appState.authService.userProfile?.fullName ?? "User"
+            let conv = try? await appState.chatService.getOrCreateConversation(
+                userId: userId,
+                userName: userName,
+                caregiverId: caregiver.id,
+                caregiverName: caregiver.name,
+                caregiverSpecialty: caregiver.specialty
+            )
+            chatConversation = conv
+            showChat = true
+        }
+    }
 }
 
 #Preview {
-    HomeView()
+    HomeView(suppressMainTabBar: .constant(false))
         .environment(AppState())
 }

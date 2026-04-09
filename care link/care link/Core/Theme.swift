@@ -42,12 +42,19 @@ enum CLTheme {
     static let spacingXL: CGFloat = 32
     static let spacingXXL: CGFloat = 48
 
-    // MARK: - Corner Radius
-    static let cornerRadiusSM: CGFloat = 8
-    static let cornerRadiusMD: CGFloat = 12
-    static let cornerRadiusLG: CGFloat = 16
-    static let cornerRadiusXL: CGFloat = 20
+    // MARK: - Corner Radius (softer, more “app-native” curves)
+    static let cornerRadiusSM: CGFloat = 10
+    static let cornerRadiusMD: CGFloat = 16
+    static let cornerRadiusLG: CGFloat = 22
+    static let cornerRadiusXL: CGFloat = 28
     static let cornerRadiusFull: CGFloat = 50
+    /// Large marketing / hero panels on welcome & onboarding.
+    static let cornerRadiusHero: CGFloat = 32
+
+    /// Continuous corners read smoother than default on cards and sheets.
+    static func continuousRect(cornerRadius: CGFloat) -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
 
     // MARK: - Shadow
     static let shadowLight = Color.black.opacity(0.05)

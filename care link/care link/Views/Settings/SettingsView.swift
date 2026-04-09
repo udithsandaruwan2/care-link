@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var notificationsEnabled = true
     @State private var biometricEnabled = false
+    @State private var isSyncingBiometricToggle = false
+    @State private var showBiometricInfoAlert = false
+    @State private var biometricInfoMessage = ""
     @State private var fontSize: Double = 16
     @State private var showDeleteConfirmation = false
     @State private var showSignOutConfirmation = false
@@ -22,9 +25,12 @@ struct SettingsView: View {
                     settingsRow(icon: "faceid", title: "Biometric Login", color: CLTheme.tealAccent) {
                         Toggle("", isOn: $biometricEnabled)
                             .tint(CLTheme.tealAccent)
+                            .disabled(!appState.biometricService.isAvailable)
                     }
                 } header: {
                     Text("Security & Privacy")
+                } footer: {
+                    Text("After you sign in once and tap Enable, CareLink can unlock with Face ID, Touch ID, or your passcode each time you open the app (Simulator: set a device passcode or use Features → Face ID). Turn off to remove saved sign-in.")
                 }
 
                 Section {
@@ -171,7 +177,76 @@ struct SettingsView: View {
             } message: {
                 Text("This action cannot be undone. All your data will be permanently deleted.")
             }
+            .alert("Biometric Login", isPresented: $showBiometricInfoAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(biometricInfoMessage)
+            }
+            .onAppear {
+                appState.biometricService.checkAvailability()
+                let localEnabled = UserDefaults.standard.bool(forKey: AppState.biometricAppUnlockPreferenceKey)
+                let profileEnabled = appState.authService.userProfile?.isBiometricEnabled == true
+                biometricEnabled = localEnabled && profileEnabled
+            }
+            .onChange(of: biometricEnabled) { _, newValue in
+                guard !isSyncingBiometricToggle else { return }
+                Task {
+                    if newValue {
+                        await handleEnableBiometricToggle()
+                    } else {
+                        await handleDisableBiometricToggle()
+                    }
+                }
+            }
         }
+    }
+
+    @MainActor
+    private func handleEnableBiometricToggle() async {
+        guard appState.biometricService.isAvailable else {
+            biometricInfoMessage = "Biometric authentication is not available on this device."
+            showBiometricInfoAlert = true
+            setBiometricToggle(false)
+            return
+        }
+        guard var profile = appState.authService.userProfile else {
+            biometricInfoMessage = "Your profile is still loading. Please try enabling biometric login again in a moment."
+            showBiometricInfoAlert = true
+            setBiometricToggle(false)
+            return
+        }
+
+        let ok = await appState.biometricService.authenticate()
+        guard ok else {
+            setBiometricToggle(false)
+            return
+        }
+
+        UserDefaults.standard.set(true, forKey: AppState.biometricAppUnlockPreferenceKey)
+        profile.isBiometricEnabled = true
+        try? await appState.firestoreService.updateUser(profile)
+        await appState.authService.fetchUserProfile(uid: profile.id)
+        setBiometricToggle(true)
+    }
+
+    @MainActor
+    private func handleDisableBiometricToggle() async {
+        BiometricCredentialStore.clear()
+        appState.isBiometricAppLocked = false
+        UserDefaults.standard.removeObject(forKey: AppState.biometricAppUnlockPreferenceKey)
+        if var profile = appState.authService.userProfile {
+            profile.isBiometricEnabled = false
+            try? await appState.firestoreService.updateUser(profile)
+            await appState.authService.fetchUserProfile(uid: profile.id)
+        }
+        setBiometricToggle(false)
+    }
+
+    @MainActor
+    private func setBiometricToggle(_ enabled: Bool) {
+        isSyncingBiometricToggle = true
+        biometricEnabled = enabled
+        isSyncingBiometricToggle = false
     }
 
     private func settingsRow<Accessory: View>(
@@ -184,9 +259,9 @@ struct SettingsView: View {
             Image(systemName: icon)
                 .font(.system(size: 16))
                 .foregroundStyle(color)
-                .frame(width: 28, height: 28)
+                .frame(width: 30, height: 30)
                 .background(color.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM, style: .continuous))
 
             Text(title)
                 .font(CLTheme.bodyFont)

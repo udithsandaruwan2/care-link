@@ -48,6 +48,12 @@ final class MapViewModel {
         }
     }
 
+    func clearCaregiverSelection() {
+        withAnimation(.spring(response: 0.3)) {
+            selectedCaregiver = nil
+        }
+    }
+
     func centerOnUserLocation(_ location: CLLocationCoordinate2D) {
         withAnimation {
             cameraPosition = .region(

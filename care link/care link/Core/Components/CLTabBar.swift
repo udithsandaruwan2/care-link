@@ -55,24 +55,25 @@ struct CLTabBar: View {
                 Spacer()
             }
         }
-        .padding(.top, 12)
-        .padding(.bottom, 8)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+        .padding(.horizontal, CLTheme.spacingXS)
         .background(
             CLTheme.cardBackground
-                .shadow(color: CLTheme.shadowMedium, radius: 12, x: 0, y: -4)
+                .shadow(color: CLTheme.shadowMedium.opacity(0.85), radius: 16, x: 0, y: -6)
         )
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL))
+        .clipShape(Capsule())
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.bottom, CLTheme.spacingSM)
     }
 
     private func tabButton(_ tab: CLTab) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3)) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
                 selectedTab = tab
             }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: selectedTab == tab ? tab.selectedIcon : tab.icon)
                         .font(.system(size: 22))
@@ -87,10 +88,15 @@ struct CLTabBar: View {
                 }
 
                 Text(tab.rawValue)
-                    .font(.system(size: 10, weight: selectedTab == tab ? .bold : .medium))
+                    .font(.system(size: 9, weight: selectedTab == tab ? .bold : .medium))
+                    .tracking(0.3)
             }
             .foregroundStyle(selectedTab == tab ? CLTheme.primaryNavy : CLTheme.textTertiary)
+            .frame(minWidth: 52)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var badgeDot: some View {

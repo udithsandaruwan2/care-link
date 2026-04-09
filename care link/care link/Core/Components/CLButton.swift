@@ -15,6 +15,10 @@ struct CLButton: View {
         case text
     }
 
+    private var usesTallChrome: Bool {
+        style != .text
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: CLTheme.spacingSM) {
@@ -27,21 +31,29 @@ struct CLButton: View {
                             .font(.system(size: 16, weight: .semibold))
                     }
                     Text(title)
-                        .font(CLTheme.headlineFont)
+                        .font(usesTallChrome ? CLTheme.headlineFont : CLTheme.calloutFont)
                 }
             }
             .frame(maxWidth: isFullWidth ? .infinity : nil)
-            .frame(height: 54)
+            .frame(height: usesTallChrome ? 56 : 44)
+            .padding(.horizontal, usesTallChrome ? 0 : CLTheme.spacingMD)
             .foregroundStyle(foregroundColor)
             .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull))
+            .clipShape(Capsule())
             .overlay {
                 if style == .outline {
-                    RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull)
+                    Capsule()
                         .stroke(CLTheme.divider, lineWidth: 1.5)
                 }
             }
+            .shadow(
+                color: style == .primary ? CLTheme.primaryNavy.opacity(0.22) : .clear,
+                radius: style == .primary ? 12 : 0,
+                x: 0,
+                y: style == .primary ? 6 : 0
+            )
         }
+        .buttonStyle(CLPressableButtonStyle())
         .disabled(isLoading)
     }
 
@@ -70,6 +82,15 @@ struct CLButton: View {
         case .text:
             return CLTheme.accentBlue
         }
+    }
+}
+
+private struct CLPressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 

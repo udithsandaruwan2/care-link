@@ -34,16 +34,16 @@ struct ConnectionRequestsView: View {
             segmentButton("Pending", index: 0, count: pendingConnections.count)
             segmentButton("Connected", index: 1, count: activeConnections.count)
         }
-        .padding(4)
+        .padding(5)
         .background(CLTheme.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+        .clipShape(Capsule())
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.vertical, CLTheme.spacingSM)
     }
 
     private func segmentButton(_ title: String, index: Int, count: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3)) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
                 selectedTab = index
             }
         } label: {
@@ -61,11 +61,12 @@ struct ConnectionRequestsView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 11)
             .foregroundStyle(selectedTab == index ? .white : CLTheme.textSecondary)
             .background(selectedTab == index ? CLTheme.primaryNavy : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+            .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Pending
@@ -128,11 +129,12 @@ struct ConnectionRequestsView: View {
                         Text("Decline")
                             .font(CLTheme.calloutFont)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 12)
                             .foregroundStyle(CLTheme.errorRed)
                             .background(CLTheme.errorRed.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
 
                     Button {
                         Task { await approveConnection(connection) }
@@ -140,11 +142,12 @@ struct ConnectionRequestsView: View {
                         Text("Approve")
                             .font(CLTheme.calloutFont)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, 12)
                             .foregroundStyle(.white)
                             .background(CLTheme.successGreen)
-                            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

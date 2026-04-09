@@ -8,15 +8,23 @@ struct LoginView: View {
     @State private var viewModel = AuthViewModel()
     @State private var showResetAlert = false
     @State private var resetSent = false
+    @State private var showBiometricSetupAlert = false
+    @State private var postLoginIntent: PostLoginIntent?
     @FocusState private var focusedField: Field?
 
     private enum Field { case email, password, confirm }
+
+    private enum PostLoginIntent {
+        case newUser
+        case existingUser
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: CLTheme.spacingLG) {
                 Spacer(minLength: CLTheme.spacingXL)
                 branding
+                biometricQuickSignInSection
                 formSection
                 actionButtons
                 dividerRow
@@ -38,6 +46,79 @@ struct LoginView: View {
             Text(resetSent
                  ? "A password reset link has been sent to \(viewModel.email)."
                  : "Enter your email above, then tap Forgot Password.")
+        }
+        .alert("Sign in faster next time?", isPresented: $showBiometricSetupAlert) {
+            Button("Enable") {
+                Task {
+                    await enableBiometricForNextLogin()
+                    flushPostLoginIntent()
+                }
+            }
+            Button("Not Now", role: .cancel) {
+                flushPostLoginIntent()
+            }
+        } message: {
+            Text("Enable biometric unlock for this account. If you signed in with email/password, your password is stored securely in Keychain for quick sign-in. If you signed in with Google, biometric unlock protects app reopening for your active session.")
+        }
+        .onAppear {
+            appState.biometricService.checkAvailability()
+            BiometricCredentialStore.syncDisplayEmailFromKeychainIfNeeded()
+        }
+    }
+
+    // MARK: - Saved account + Face ID / Touch ID / passcode sign-in
+
+    @ViewBuilder
+    private var biometricQuickSignInSection: some View {
+        if !viewModel.isSignUpMode,
+           BiometricCredentialStore.hasCredentials,
+           appState.biometricService.isAvailable {
+            VStack(spacing: CLTheme.spacingMD) {
+                CLCard {
+                    VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                        HStack(spacing: CLTheme.spacingSM) {
+                            Image(systemName: "person.crop.circle.badge.checkmark")
+                                .font(.system(size: 28))
+                                .foregroundStyle(CLTheme.tealAccent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Account saved on this device")
+                                    .font(CLTheme.calloutFont.weight(.semibold))
+                                    .foregroundStyle(CLTheme.textPrimary)
+                                if let email = BiometricCredentialStore.lastUsedEmailForDisplay {
+                                    Text(email)
+                                        .font(CLTheme.bodyFont)
+                                        .foregroundStyle(CLTheme.textSecondary)
+                                        .lineLimit(1)
+                                } else {
+                                    Text("Sign in with Face ID, Touch ID, or passcode")
+                                        .font(CLTheme.captionFont)
+                                        .foregroundStyle(CLTheme.textTertiary)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+
+                        Text("Your password is stored securely in the Keychain. Tap below to open CareLink with your previous account.")
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, CLTheme.spacingLG)
+
+                CLButton(
+                    title: "Log in with \(appState.biometricService.unlockButtonLabel)",
+                    icon: appState.biometricService.biometricIcon,
+                    isLoading: viewModel.isLoading
+                ) {
+                    Task { await performBiometricSignIn() }
+                }
+                .padding(.horizontal, CLTheme.spacingLG)
+
+                Text("Or use email and password below")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textTertiary)
+            }
         }
     }
 
@@ -93,7 +174,11 @@ struct LoginView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
                 .frame(height: 54)
                 .background(CLTheme.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                .clipShape(Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
+                }
             }
 
             VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
@@ -124,7 +209,11 @@ struct LoginView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
                 .frame(height: 54)
                 .background(CLTheme.backgroundSecondary)
-                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                .clipShape(Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
+                }
             }
 
             if viewModel.isSignUpMode {
@@ -150,7 +239,11 @@ struct LoginView: View {
                     .padding(.horizontal, CLTheme.spacingMD)
                     .frame(height: 54)
                     .background(CLTheme.backgroundSecondary)
-                    .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                    .clipShape(Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
+                    }
                 }
             }
 
@@ -220,14 +313,15 @@ struct LoginView: View {
             }
             .foregroundStyle(CLTheme.textPrimary)
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(height: 56)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull))
+            .clipShape(Capsule())
             .overlay {
-                RoundedRectangle(cornerRadius: CLTheme.cornerRadiusFull)
+                Capsule()
                     .stroke(CLTheme.divider, lineWidth: 1.5)
             }
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, CLTheme.spacingLG)
     }
 
@@ -254,17 +348,17 @@ struct LoginView: View {
 
     private func performSignIn() {
         focusedField = nil
-        Task {
+        Task { @MainActor in
             let result = await viewModel.signIn(authService: appState.authService)
-            handleResult(result)
+            handleResult(result, offerBiometricOptIn: true)
         }
     }
 
     private func performSignUp() {
         focusedField = nil
-        Task {
+        Task { @MainActor in
             let result = await viewModel.signUp(authService: appState.authService)
-            handleResult(result)
+            handleResult(result, offerBiometricOptIn: true)
         }
     }
 
@@ -299,36 +393,115 @@ struct LoginView: View {
                 return
             }
 
-            Task {
+            Task { @MainActor in
                 let signInResult = await viewModel.handleGoogleSignIn(
                     authService: appState.authService,
                     idToken: idToken,
                     accessToken: user.accessToken.tokenString
                 )
-                handleResult(signInResult)
+                handleResult(signInResult, offerBiometricOptIn: true)
             }
         }
     }
 
-    private func handleResult(_ result: AuthViewModel.SignInResult) {
-        switch result {
-        case .newUser:
-            appState.needsProfileSetup = true
-            appState.isAuthenticated = true
-            appState.showWelcome = false
-        case .existingUser:
-            if let profile = appState.authService.userProfile {
-                appState.currentUserRole = profile.role
-                if profile.role == .caregiver && !profile.hasCompletedCaregiverRegistration {
-                    appState.needsCaregiverRegistration = true
-                }
-                appState.startChatListener()
+    @MainActor
+    private func performBiometricSignIn() async {
+        viewModel.isLoading = true
+        defer { viewModel.isLoading = false }
+        let unlocked = await appState.biometricService.authenticate()
+        guard unlocked else { return }
+        guard let creds = BiometricCredentialStore.loadCredentials() else { return }
+        viewModel.email = creds.email
+        viewModel.password = creds.password
+        let result = await viewModel.signIn(authService: appState.authService)
+        handleResult(result, offerBiometricOptIn: false)
+    }
+
+    @MainActor
+    private func enableBiometricForNextLogin() async {
+        let ok = await appState.biometricService.authenticate()
+        guard ok else { return }
+        do {
+            let password = viewModel.password.trimmingCharacters(in: .whitespacesAndNewlines)
+            if password.isEmpty {
+                // Google/SSO path: no local password to store for quick sign-in.
+                BiometricCredentialStore.clear()
+            } else {
+                try BiometricCredentialStore.save(
+                    email: viewModel.email,
+                    password: viewModel.password
+                )
             }
-            appState.isAuthenticated = true
-            appState.showWelcome = false
+            UserDefaults.standard.set(true, forKey: AppState.biometricAppUnlockPreferenceKey)
+            if var profile = appState.authService.userProfile {
+                profile.isBiometricEnabled = true
+                try? await appState.firestoreService.updateUser(profile)
+                await appState.authService.fetchUserProfile(uid: profile.id)
+            }
+        } catch {
+            viewModel.errorMessage = "Could not save quick sign-in. Try again in Settings after signing in."
+            viewModel.showError = true
+        }
+    }
+
+    @MainActor
+    private func handleResult(_ result: AuthViewModel.SignInResult, offerBiometricOptIn: Bool) {
+        switch result {
         case .failed:
             break
+        case .newUser:
+            if shouldOfferBiometricSetup(offerBiometricOptIn) {
+                postLoginIntent = .newUser
+                showBiometricSetupAlert = true
+                return
+            }
+            applyNewUserLogin()
+        case .existingUser:
+            if shouldOfferBiometricSetup(offerBiometricOptIn) {
+                postLoginIntent = .existingUser
+                showBiometricSetupAlert = true
+                return
+            }
+            applyExistingUserLogin()
         }
+    }
+
+    private func flushPostLoginIntent() {
+        guard postLoginIntent != nil else { return }
+        let intent = postLoginIntent
+        postLoginIntent = nil
+        switch intent {
+        case .newUser:
+            applyNewUserLogin()
+        case .existingUser:
+            applyExistingUserLogin()
+        case .none:
+            break
+        }
+    }
+
+    private func applyNewUserLogin() {
+        appState.needsProfileSetup = true
+        appState.isAuthenticated = true
+        appState.showWelcome = false
+    }
+
+    private func applyExistingUserLogin() {
+        if let profile = appState.authService.userProfile {
+            appState.currentUserRole = profile.role
+            if profile.role == .caregiver && !profile.hasCompletedCaregiverRegistration {
+                appState.needsCaregiverRegistration = true
+            }
+            appState.startChatListener()
+        }
+        appState.isAuthenticated = true
+        appState.showWelcome = false
+    }
+
+    private func shouldOfferBiometricSetup(_ offerBiometricOptIn: Bool) -> Bool {
+        offerBiometricOptIn
+            && appState.biometricService.isAvailable
+            && !BiometricCredentialStore.hasCredentials
     }
 }
 

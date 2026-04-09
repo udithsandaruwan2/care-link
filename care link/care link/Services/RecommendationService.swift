@@ -1,5 +1,4 @@
 import Foundation
-import CoreML
 
 @Observable
 final class RecommendationService {

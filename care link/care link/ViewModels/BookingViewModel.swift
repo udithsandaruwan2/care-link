@@ -43,13 +43,23 @@ final class BookingViewModel {
         }
     }
 
-    func confirmBooking(caregiver: Caregiver, userId: String, firestoreService: FirestoreService) async -> Bool {
+    func confirmBooking(
+        caregiver: Caregiver,
+        userId: String,
+        patientName: String,
+        patientAddress: String,
+        firestoreService: FirestoreService,
+        chatService: ChatService
+    ) async -> Bool {
         isLoading = true
         defer { isLoading = false }
 
+        let bookingId = "bk_\(UUID().uuidString.prefix(8).lowercased())"
+        let addr = patientAddress.trimmingCharacters(in: .whitespaces)
         let booking = Booking(
-            id: "bk_\(UUID().uuidString.prefix(8))",
+            id: bookingId,
             userId: userId,
+            patientName: patientName,
             caregiverId: caregiver.id,
             caregiverName: caregiver.name,
             caregiverSpecialty: caregiver.specialty,
@@ -60,15 +70,28 @@ final class BookingViewModel {
             endTime: endTime,
             duration: duration,
             totalCost: estimatedTotal(for: caregiver),
-            status: .pending,
+            status: .awaitingCaregiver,
             location: "Home Residence",
-            address: "124 Medical Plaza, Apt 4B",
+            address: addr.isEmpty ? "Address on file" : addr,
             paymentMethod: selectedPaymentMethod,
             createdAt: Date()
         )
 
         do {
             try await firestoreService.createBooking(booking)
+            let conversation = try await chatService.getOrCreateConversation(
+                userId: userId,
+                userName: patientName,
+                caregiverId: caregiver.id,
+                caregiverName: caregiver.name,
+                caregiverSpecialty: caregiver.specialty
+            )
+            try await chatService.sendBookingRequestMessage(
+                conversationId: conversation.id,
+                senderId: userId,
+                senderName: patientName,
+                booking: booking
+            )
             confirmedBooking = booking
             bookingConfirmed = true
             return true

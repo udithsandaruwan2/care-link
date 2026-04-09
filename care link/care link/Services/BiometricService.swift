@@ -11,24 +11,25 @@ final class BiometricService {
         checkAvailability()
     }
 
+    /// Uses `.deviceOwnerAuthentication` so Face ID / Touch ID **or the device passcode** is allowed.
+    /// This matches the iOS Settings screen and works on the **Simulator** (passcode, or Features → Face ID → Enrolled + Matching Face).
     func checkAvailability() {
         let context = LAContext()
         var error: NSError?
-        isAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        isAvailable = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
         biometricType = context.biometryType
     }
 
     func authenticate() async -> Bool {
         let context = LAContext()
-        context.localizedReason = "Confirm your identity to access your private health records."
+        context.localizedReason = "Unlock CareLink to protect your health information."
         context.localizedCancelTitle = "Cancel"
 
         do {
-            let success = try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: "Confirm your identity to access your private health records."
+            return try await context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Unlock CareLink to protect your health information."
             )
-            return success
         } catch {
             errorMessage = error.localizedDescription
             return false
@@ -40,7 +41,17 @@ final class BiometricService {
         case .faceID: return "Face ID"
         case .touchID: return "Touch ID"
         case .opticID: return "Optic ID"
-        default: return "Biometrics"
+        default: return "Device Passcode"
+        }
+    }
+
+    /// Shorter label for buttons when only passcode is available (e.g. Simulator without Face ID enrolled).
+    var unlockButtonLabel: String {
+        switch biometricType {
+        case .faceID: return "Face ID"
+        case .touchID: return "Touch ID"
+        case .opticID: return "Optic ID"
+        default: return "Passcode"
         }
     }
 

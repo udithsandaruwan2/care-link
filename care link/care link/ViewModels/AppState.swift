@@ -4,6 +4,9 @@ import FirebaseAuth
 
 @Observable
 final class AppState {
+    /// When true (after user opts in), reopening the app with a Firebase session requires unlock via Face ID / Touch ID / passcode.
+    static let biometricAppUnlockPreferenceKey = "carelink.biometricAppUnlockEnabled"
+
     var isOnboardingComplete: Bool = UserDefaults.standard.bool(forKey: "isOnboardingComplete") {
         didSet { UserDefaults.standard.set(isOnboardingComplete, forKey: "isOnboardingComplete") }
     }
@@ -13,6 +16,10 @@ final class AppState {
     var currentUserRole: CLUser.UserRole = .user
     var needsCaregiverRegistration = false
     var needsProfileSetup = false
+    /// When true, a full-screen Face ID / Touch ID gate covers the app (after backgrounding or cold start with saved biometric sign-in).
+    var isBiometricAppLocked = false
+    /// Prevents a late profile fetch from re-arming the lock after the user has already unlocked.
+    private var didRunProfileBiometricLockPass = false
     var navigationResetToken = UUID()
 
     let authService = AuthService()
@@ -29,18 +36,77 @@ final class AppState {
         if let user = Auth.auth().currentUser {
             isAuthenticated = true
             showWelcome = false
+            biometricService.checkAvailability()
+            applyBiometricLockOnColdStartIfNeeded()
             Task {
                 await authService.fetchUserProfile(uid: user.uid)
-                if let profile = authService.userProfile {
-                    currentUserRole = profile.role
-                    if profile.role == .caregiver && !profile.hasCompletedCaregiverRegistration {
-                        needsCaregiverRegistration = true
+                await MainActor.run {
+                    if let profile = authService.userProfile {
+                        currentUserRole = profile.role
+                        if profile.role == .caregiver && !profile.hasCompletedCaregiverRegistration {
+                            needsCaregiverRegistration = true
+                        }
+                        startChatListener()
+                    } else {
+                        needsProfileSetup = true
                     }
-                    startChatListener()
-                } else {
-                    needsProfileSetup = true
+                    applyBiometricLockAfterProfileIfNeeded()
                 }
             }
+        } else {
+            didRunProfileBiometricLockPass = false
+        }
+    }
+
+    /// True when biometric app lock is explicitly enabled locally and on the user profile.
+    func shouldUseBiometricAppLock() -> Bool {
+        guard isAuthenticated else { return false }
+        biometricService.checkAvailability()
+        guard biometricService.isAvailable else { return false }
+        let localEnabled = UserDefaults.standard.bool(forKey: Self.biometricAppUnlockPreferenceKey)
+        return localEnabled && authService.userProfile?.isBiometricEnabled == true
+    }
+
+    /// Lock as soon as we know a session should be shielded (Keychain / preference before profile loads).
+    private func applyBiometricLockOnColdStartIfNeeded() {
+        guard isAuthenticated else { return }
+        biometricService.checkAvailability()
+        guard biometricService.isAvailable else { return }
+        if shouldUseBiometricAppLock() {
+            isBiometricAppLocked = true
+        }
+    }
+
+    /// Locks once after profile load when shielding comes only from Firestore (no Keychain / local pref yet).
+    private func applyBiometricLockAfterProfileIfNeeded() {
+        guard !didRunProfileBiometricLockPass else { return }
+        didRunProfileBiometricLockPass = true
+
+        guard isAuthenticated else { return }
+        biometricService.checkAvailability()
+        guard biometricService.isAvailable else { return }
+        guard shouldUseBiometricAppLock() else { return }
+
+        isBiometricAppLocked = true
+    }
+
+    /// Call when the app moves to background so the next foreground requires Face ID / Touch ID.
+    func lockAppForBiometricsIfNeeded() {
+        guard shouldUseBiometricAppLock() else { return }
+        isBiometricAppLocked = true
+    }
+
+    @MainActor
+    func unlockAppWithBiometrics() async {
+        guard isBiometricAppLocked else { return }
+        biometricService.checkAvailability()
+        guard biometricService.isAvailable else {
+            isBiometricAppLocked = false
+            return
+        }
+        let ok = await biometricService.authenticate()
+        if ok {
+            isBiometricAppLocked = false
         }
     }
 
@@ -75,6 +141,9 @@ final class AppState {
         isAuthenticated = false
         needsCaregiverRegistration = false
         needsProfileSetup = false
+        isBiometricAppLocked = false
+        didRunProfileBiometricLockPass = false
+        UserDefaults.standard.removeObject(forKey: Self.biometricAppUnlockPreferenceKey)
         showWelcome = !isOnboardingComplete
     }
 
@@ -97,6 +166,10 @@ final class AppState {
         }
         persistence.save()
 
+        BiometricCredentialStore.clear()
+
+        isBiometricAppLocked = false
+        didRunProfileBiometricLockPass = false
         isAuthenticated = false
         needsCaregiverRegistration = false
         needsProfileSetup = false

@@ -11,22 +11,25 @@ struct BookingDetailsView: View {
     private let popularDurations = ["Morning (4h)", "Afternoon (3h)", "Full Day (8h)"]
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
-                    caregiverCard
-                    dateSection
-                    timeSection
-                    durationInfo
-                    popularDurationsSection
-                    paymentMethodSection
-                }
-                .padding(.bottom, 120)
+        ScrollView {
+            VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
+                caregiverCard
+                dateSection
+                timeSection
+                durationInfo
+                popularDurationsSection
+                paymentMethodSection
             }
-
-            bottomBar
+            .padding(.bottom, CLTheme.spacingMD)
         }
         .background(CLTheme.backgroundPrimary)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                bottomBar
+            }
+            .background(.ultraThinMaterial)
+        }
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -57,6 +60,11 @@ struct BookingDetailsView: View {
                 BookingConfirmationView(booking: booking, caregiver: caregiver)
                     .environment(appState)
             }
+        }
+        .alert("Booking", isPresented: $viewModel.showError) {
+            Button("OK") {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
         }
     }
 
@@ -282,11 +290,17 @@ struct BookingDetailsView: View {
 
             CLButton(title: "Confirm Booking", icon: "arrow.right", isLoading: viewModel.isLoading) {
                 Task {
-                    let userId = appState.authService.currentUser?.uid ?? "guest"
+                    let userId = appState.authService.currentUser?.uid ?? ""
+                    guard !userId.isEmpty else { return }
+                    let patientName = appState.authService.userProfile?.fullName ?? "Patient"
+                    let patientAddress = appState.authService.userProfile?.address ?? ""
                     let success = await viewModel.confirmBooking(
                         caregiver: caregiver,
                         userId: userId,
-                        firestoreService: appState.firestoreService
+                        patientName: patientName,
+                        patientAddress: patientAddress,
+                        firestoreService: appState.firestoreService,
+                        chatService: appState.chatService
                     )
                     if success {
                         appState.notificationService.scheduleLocalNotification(
@@ -298,11 +312,9 @@ struct BookingDetailsView: View {
                 }
             }
         }
-        .padding(CLTheme.spacingLG)
-        .background(
-            CLTheme.cardBackground
-                .shadow(color: CLTheme.shadowMedium, radius: 12, x: 0, y: -4)
-        )
+        .padding(.horizontal, CLTheme.spacingLG)
+        .padding(.top, CLTheme.spacingMD)
+        .padding(.bottom, CLTheme.spacingSM)
     }
 }
 

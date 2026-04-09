@@ -40,17 +40,15 @@ struct FaceIDView: View {
                         onAuthenticate()
                     }
 
-                    Button("Cancel") {
+                    CLButton(title: "Cancel", style: .outline) {
                         onCancel()
                     }
-                    .font(CLTheme.headlineFont)
-                    .foregroundStyle(CLTheme.accentBlue)
                 }
                 .padding(.horizontal, CLTheme.spacingLG)
             }
             .padding(CLTheme.spacingXL)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL))
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusXL))
             .shadow(color: CLTheme.shadowHeavy, radius: 20)
             .padding(.horizontal, CLTheme.spacingXL)
 

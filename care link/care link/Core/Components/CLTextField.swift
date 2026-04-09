@@ -55,7 +55,11 @@ struct CLTextField: View {
             .padding(.horizontal, CLTheme.spacingMD)
             .frame(height: 54)
             .background(CLTheme.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+            .clipShape(Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
+            }
         }
     }
 }

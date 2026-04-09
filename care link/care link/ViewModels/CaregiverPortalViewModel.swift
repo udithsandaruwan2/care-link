@@ -32,7 +32,7 @@ final class CaregiverPortalViewModel {
     }
 
     private func categorizeAppointments() {
-        pendingRequests = appointments.filter { $0.status == .pending }
+        pendingRequests = appointments.filter { $0.status.needsCaregiverAction }
         upcomingAppointments = appointments.filter { $0.status == .confirmed || $0.status == .inProgress }
         completedAppointments = appointments.filter { $0.status == .completed }
     }

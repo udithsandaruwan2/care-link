@@ -7,6 +7,7 @@ struct BookingConfirmationView: View {
     let caregiver: Caregiver
     @State private var addedToCalendar = false
     @State private var animate = false
+    @State private var showBookingSummary = false
 
     var body: some View {
         ScrollView {
@@ -150,7 +151,9 @@ struct BookingConfirmationView: View {
                         }
                     }
 
-                    CLButton(title: "View Booking Details", style: .primary) {}
+                    CLButton(title: "View Booking Details", style: .primary) {
+                        showBookingSummary = true
+                    }
 
                     CLButton(title: "Back to Home", style: .secondary) {
                         navigateToHome()
@@ -173,6 +176,37 @@ struct BookingConfirmationView: View {
                 animate = true
             }
         }
+        .sheet(isPresented: $showBookingSummary) {
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+                        bookingSummaryRows
+                    }
+                    .padding()
+                }
+                .background(CLTheme.backgroundPrimary)
+                .navigationTitle("Booking")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { showBookingSummary = false }
+                    }
+                }
+            }
+        }
+    }
+
+    private var bookingSummaryRows: some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
+            LabeledContent("Status", value: booking.status.rawValue)
+            LabeledContent("Caregiver", value: "\(caregiver.name) · \(caregiver.specialty)")
+            LabeledContent("When", value: "\(booking.date.formatted(date: .abbreviated, time: .omitted)), \(booking.startTime.formatted(date: .omitted, time: .shortened)) – \(booking.endTime.formatted(date: .omitted, time: .shortened))")
+            LabeledContent("Duration", value: String(format: "%.1f hours", booking.duration))
+            LabeledContent("Total", value: String(format: "$%.2f", booking.totalCost))
+            LabeledContent("Payment", value: booking.paymentMethod.displayName)
+            LabeledContent("Location", value: "\(booking.location) — \(booking.address)")
+        }
+        .font(CLTheme.bodyFont)
     }
 
     private func navigateToHome() {
@@ -183,7 +217,7 @@ struct BookingConfirmationView: View {
 #Preview {
     BookingConfirmationView(
         booking: Booking(
-            id: "bk_preview", userId: "u1", caregiverId: "cg1", caregiverName: "Sarah Jenkins",
+            id: "bk_preview", userId: "u1", patientName: "You", caregiverId: "cg1", caregiverName: "Sarah Jenkins",
             caregiverSpecialty: "RN", caregiverImageURL: "", caregiverRating: 4.9,
             date: Date(), startTime: Date(), endTime: Date().addingTimeInterval(3600 * 2),
             duration: 2, totalCost: 70, status: .pending, location: "Home", address: "123 St",

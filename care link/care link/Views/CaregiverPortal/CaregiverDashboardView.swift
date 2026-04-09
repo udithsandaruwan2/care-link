@@ -14,6 +14,7 @@ struct CaregiverDashboardView: View {
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
     @State private var showEditProfile = false
+    @State private var featuredBooking: Booking?
 
     var body: some View {
         NavigationStack {
@@ -24,6 +25,10 @@ struct CaregiverDashboardView: View {
                     VStack(spacing: CLTheme.spacingLG) {
                         greetingSection
                         overviewCards
+
+                        if let fb = featuredBooking {
+                            activePatientHeroCard(fb)
+                        }
 
                         if !pendingConnections.isEmpty {
                             pendingRequestsSection
@@ -80,6 +85,102 @@ struct CaregiverDashboardView: View {
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
+    // MARK: - Active patient (confirmed booking)
+
+    private func activePatientHeroCard(_ booking: Booking) -> some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            Text("Your patient")
+                .font(CLTheme.title2Font)
+                .foregroundStyle(CLTheme.textPrimary)
+                .padding(.horizontal, CLTheme.spacingMD)
+
+            VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                HStack(spacing: CLTheme.spacingMD) {
+                    Circle()
+                        .fill(CLTheme.tealAccent.opacity(0.2))
+                        .frame(width: 56, height: 56)
+                        .overlay {
+                            Text(String((booking.patientName.isEmpty ? "PT" : booking.patientName).prefix(2)).uppercased())
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(CLTheme.tealAccent)
+                        }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(booking.patientName.isEmpty ? "Patient" : booking.patientName)
+                            .font(CLTheme.headlineFont)
+                            .foregroundStyle(CLTheme.textPrimary)
+                        Text(booking.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textSecondary)
+                        Text("\(booking.startTime.formatted(date: .omitted, time: .shortened)) – \(booking.endTime.formatted(date: .omitted, time: .shortened))")
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textTertiary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("$\(String(format: "%.0f", booking.totalCost))")
+                            .font(CLTheme.titleFont)
+                            .foregroundStyle(CLTheme.accentBlue)
+                        Text(booking.paymentMethod.displayName)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CLTheme.textTertiary)
+                    }
+                }
+
+                HStack(spacing: CLTheme.spacingMD) {
+                    Button {
+                        openChatForBookingPatient(booking)
+                    } label: {
+                        Label("Message", systemImage: "message.fill")
+                            .font(CLTheme.calloutFont)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .foregroundStyle(.white)
+                            .background(CLTheme.primaryNavy)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        selectedPatientId = booking.userId
+                        selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+                        showMedicalRecords = true
+                    } label: {
+                        Label("Records", systemImage: "doc.text.fill")
+                            .font(CLTheme.calloutFont)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .foregroundStyle(CLTheme.primaryNavy)
+                            .background(CLTheme.lightBlue)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(CLTheme.spacingMD)
+            .background(CLTheme.cardBackground)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusXL))
+            .shadow(color: CLTheme.shadowLight, radius: 10, y: 3)
+            .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private func openChatForBookingPatient(_ booking: Booking) {
+        Task {
+            let caregiverId = appState.authService.currentUser?.uid ?? ""
+            let caregiverName = appState.authService.userProfile?.fullName ?? "Caregiver"
+            let patientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+            let conv = try? await appState.chatService.getOrCreateConversation(
+                userId: booking.userId,
+                userName: patientName,
+                caregiverId: caregiverId,
+                caregiverName: caregiverName,
+                caregiverSpecialty: ""
+            )
+            chatConversation = conv
+            showChat = true
+        }
+    }
+
     // MARK: - Overview Cards
 
     private var overviewCards: some View {
@@ -129,8 +230,8 @@ struct CaregiverDashboardView: View {
         .frame(width: 130, alignment: .leading)
         .padding(CLTheme.spacingMD)
         .background(CLTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-        .shadow(color: CLTheme.shadowLight, radius: 4)
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+        .shadow(color: CLTheme.shadowLight, radius: 6, y: 2)
     }
 
     // MARK: - Pending Requests
@@ -321,15 +422,15 @@ struct CaregiverDashboardView: View {
             segmentButton("Upcoming", index: 1, count: viewModel.upcomingAppointments.count)
             segmentButton("Done", index: 2, count: viewModel.completedAppointments.count)
         }
-        .padding(4)
+        .padding(5)
         .background(CLTheme.backgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+        .clipShape(Capsule())
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
     private func segmentButton(_ title: String, index: Int, count: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3)) { selectedSection = index }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { selectedSection = index }
         } label: {
             HStack(spacing: 4) {
                 Text(title)
@@ -345,11 +446,12 @@ struct CaregiverDashboardView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 11)
             .foregroundStyle(selectedSection == index ? .white : CLTheme.textSecondary)
             .background(selectedSection == index ? CLTheme.primaryNavy : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+            .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
     }
 
     private func appointmentCard(_ booking: Booking) -> some View {
@@ -357,7 +459,7 @@ struct CaregiverDashboardView: View {
             VStack(spacing: CLTheme.spacingMD) {
                 HStack {
                     VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
-                        Text(booking.caregiverName.isEmpty ? "Patient" : booking.caregiverName)
+                        Text(booking.patientName.isEmpty ? "Patient" : booking.patientName)
                             .font(CLTheme.headlineFont)
                             .foregroundStyle(CLTheme.textPrimary)
                         Text(booking.date.formatted(date: .abbreviated, time: .omitted))
@@ -384,7 +486,7 @@ struct CaregiverDashboardView: View {
                         .foregroundStyle(CLTheme.accentBlue)
                 }
 
-                if booking.status == .pending {
+                if booking.status.needsCaregiverAction {
                     HStack(spacing: CLTheme.spacingMD) {
                         Button {
                             Task { await viewModel.rejectBooking(bookingId: booking.id, firestoreService: appState.firestoreService) }
@@ -392,22 +494,24 @@ struct CaregiverDashboardView: View {
                             Text("Decline")
                                 .font(CLTheme.calloutFont)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
                                 .foregroundStyle(CLTheme.errorRed)
                                 .background(CLTheme.errorRed.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
                         Button {
                             Task { await viewModel.acceptBooking(bookingId: booking.id, firestoreService: appState.firestoreService) }
                         } label: {
                             Text("Accept")
                                 .font(CLTheme.calloutFont)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
                                 .foregroundStyle(.white)
                                 .background(CLTheme.successGreen)
-                                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
+                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -439,6 +543,7 @@ struct CaregiverDashboardView: View {
             self.pendingConnections = (try? await appState.firestoreService.fetchPendingConnectionsForCaregiver(caregiverId)) ?? []
         }()
         _ = await (appointmentsTask, patientsTask, pendingTask)
+        featuredBooking = viewModel.upcomingAppointments.min(by: { $0.date == $1.date ? $0.startTime < $1.startTime : $0.date < $1.date })
     }
 
     private func approveConnection(_ connection: Connection) async {

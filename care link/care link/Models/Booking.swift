@@ -3,6 +3,8 @@ import Foundation
 struct Booking: Identifiable, Codable, Sendable {
     let id: String
     var userId: String
+    /// Display name of the patient (for caregiver-facing UI).
+    var patientName: String
     var caregiverId: String
     var caregiverName: String
     var caregiverSpecialty: String
@@ -20,6 +22,8 @@ struct Booking: Identifiable, Codable, Sendable {
     var createdAt: Date
 
     enum BookingStatus: String, Codable, Sendable, CaseIterable {
+        /// User submitted; caregiver must accept in chat or dashboard.
+        case awaitingCaregiver = "Awaiting caregiver"
         case pending = "Pending"
         case confirmed = "Confirmed"
         case inProgress = "In Progress"
@@ -28,12 +32,16 @@ struct Booking: Identifiable, Codable, Sendable {
 
         var color: String {
             switch self {
-            case .pending: return "F59E0B"
+            case .awaitingCaregiver, .pending: return "F59E0B"
             case .confirmed: return "0066CC"
             case .inProgress: return "0D9488"
             case .completed: return "16A34A"
             case .cancelled: return "DC2626"
             }
+        }
+
+        var needsCaregiverAction: Bool {
+            self == .awaitingCaregiver || self == .pending
         }
     }
 
@@ -58,9 +66,10 @@ struct Booking: Identifiable, Codable, Sendable {
         }
     }
 
-    init(id: String, userId: String, caregiverId: String, caregiverName: String, caregiverSpecialty: String, caregiverImageURL: String, caregiverRating: Double, date: Date, startTime: Date, endTime: Date, duration: Double, totalCost: Double, status: BookingStatus, location: String, address: String, paymentMethod: PaymentMethod, createdAt: Date) {
+    init(id: String, userId: String, patientName: String = "", caregiverId: String, caregiverName: String, caregiverSpecialty: String, caregiverImageURL: String, caregiverRating: Double, date: Date, startTime: Date, endTime: Date, duration: Double, totalCost: Double, status: BookingStatus, location: String, address: String, paymentMethod: PaymentMethod, createdAt: Date) {
         self.id = id
         self.userId = userId
+        self.patientName = patientName
         self.caregiverId = caregiverId
         self.caregiverName = caregiverName
         self.caregiverSpecialty = caregiverSpecialty
@@ -82,6 +91,7 @@ struct Booking: Identifiable, Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         userId = try container.decode(String.self, forKey: .userId)
+        patientName = try container.decodeIfPresent(String.self, forKey: .patientName) ?? ""
         caregiverId = try container.decode(String.self, forKey: .caregiverId)
         caregiverName = try container.decode(String.self, forKey: .caregiverName)
         caregiverSpecialty = try container.decode(String.self, forKey: .caregiverSpecialty)

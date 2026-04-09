@@ -12,11 +12,18 @@ struct AlertsView: View {
                         .foregroundStyle(CLTheme.textPrimary)
                     Spacer()
                     if appState.notificationService.unreadCount > 0 {
-                        Button("Mark all read") {
+                        Button {
                             appState.notificationService.markAllAsRead()
+                        } label: {
+                            Text("Mark all read")
+                                .font(CLTheme.calloutFont.weight(.semibold))
+                                .foregroundStyle(CLTheme.accentBlue)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(CLTheme.lightBlue.opacity(0.65))
+                                .clipShape(Capsule())
                         }
-                        .font(CLTheme.calloutFont)
-                        .foregroundStyle(CLTheme.accentBlue)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, CLTheme.spacingMD)
@@ -79,8 +86,9 @@ struct AlertsView: View {
             }
             .padding(CLTheme.spacingMD)
             .background(notification.isRead ? CLTheme.cardBackground : CLTheme.lightBlue.opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
         }
+        .buttonStyle(.plain)
     }
 
     private var emptyState: some View {

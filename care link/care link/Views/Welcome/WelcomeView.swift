@@ -32,7 +32,7 @@ struct WelcomeView: View {
             }
             .padding(.bottom, CLTheme.spacingXL)
 
-            RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL)
+            CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusHero)
                 .fill(
                     LinearGradient(
                         colors: [CLTheme.tealAccent.opacity(0.6), CLTheme.primaryNavy.opacity(0.8)],

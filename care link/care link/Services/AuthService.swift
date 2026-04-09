@@ -112,6 +112,8 @@ final class AuthService {
         guard let user = currentUser else { return }
         try await db.collection("users").document(user.uid).delete()
         try await user.delete()
+        BiometricCredentialStore.clear()
+        UserDefaults.standard.removeObject(forKey: AppState.biometricAppUnlockPreferenceKey)
         currentUser = nil
         userProfile = nil
         isAuthenticated = false

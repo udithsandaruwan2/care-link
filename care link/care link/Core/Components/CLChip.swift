@@ -11,8 +11,8 @@ struct CLChip: View {
         } label: {
             Text(title)
                 .font(CLTheme.calloutFont)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
                 .foregroundStyle(isSelected ? .white : CLTheme.textPrimary)
                 .background(isSelected ? CLTheme.primaryNavy : CLTheme.cardBackground)
                 .clipShape(Capsule())
@@ -23,6 +23,7 @@ struct CLChip: View {
                     }
                 }
         }
+        .buttonStyle(.plain)
     }
 }
 

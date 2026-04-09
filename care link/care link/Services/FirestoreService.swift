@@ -72,6 +72,12 @@ final class FirestoreService {
         try await encodeAndSet(booking, at: db.collection("bookings").document(booking.id))
     }
 
+    func fetchBooking(bookingId: String) async throws -> Booking? {
+        let document = try await db.collection("bookings").document(bookingId).getDocument()
+        guard document.exists else { return nil }
+        return try document.data(as: Booking.self)
+    }
+
     func fetchBookings(for userId: String) async throws -> [Booking] {
         let snapshot = try await db.collection("bookings")
             .whereField("userId", isEqualTo: userId)

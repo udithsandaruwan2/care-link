@@ -50,8 +50,13 @@ struct OnboardingView: View {
                 Button("Skip") {
                     onComplete()
                 }
-                .font(CLTheme.calloutFont)
-                .foregroundStyle(CLTheme.textSecondary)
+                .font(CLTheme.calloutFont.weight(.medium))
+                .foregroundStyle(CLTheme.accentBlue)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(CLTheme.backgroundSecondary)
+                .clipShape(Capsule())
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, CLTheme.spacingMD)
             .padding(.top, CLTheme.spacingSM)
@@ -108,7 +113,7 @@ struct OnboardingView: View {
             Spacer()
 
             ZStack {
-                RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL)
+                CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusHero)
                     .fill(
                         LinearGradient(
                             colors: page.gradient,

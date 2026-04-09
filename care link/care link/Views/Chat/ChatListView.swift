@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatListView: View {
     @Environment(AppState.self) private var appState
+    @Binding var suppressMainTabBar: Bool
     @State private var selectedConversation: ChatConversation?
     @State private var showChat = false
 
@@ -41,7 +42,13 @@ struct ChatListView: View {
                         .environment(appState)
                 }
             }
+            .onAppear { syncMainTabBarVisibility() }
+            .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
         }
+    }
+
+    private func syncMainTabBarVisibility() {
+        suppressMainTabBar = showChat
     }
 
     private func conversationRow(_ conversation: ChatConversation) -> some View {
@@ -117,6 +124,6 @@ struct ChatListView: View {
 }
 
 #Preview {
-    ChatListView()
+    ChatListView(suppressMainTabBar: .constant(false))
         .environment(AppState())
 }

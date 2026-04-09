@@ -14,9 +14,13 @@ struct CLNavigationBar: View {
                     backAction?()
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(CLTheme.textPrimary)
+                        .frame(width: 40, height: 40)
+                        .background(CLTheme.backgroundSecondary)
+                        .clipShape(Circle())
                 }
+                .buttonStyle(.plain)
             } else {
                 HStack(spacing: CLTheme.spacingSM) {
                     Image(systemName: "cross.circle.fill")
@@ -42,9 +46,13 @@ struct CLNavigationBar: View {
                     filterAction?()
                 } label: {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18))
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(CLTheme.textPrimary)
+                        .frame(width: 40, height: 40)
+                        .background(CLTheme.backgroundSecondary)
+                        .clipShape(Circle())
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, CLTheme.spacingMD)

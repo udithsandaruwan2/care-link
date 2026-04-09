@@ -23,8 +23,13 @@ struct CaregiverProfileEditView: View {
                         CaregiverAvatar(size: 90, showVerified: true)
 
                         Button("Change Photo") {}
-                            .font(CLTheme.calloutFont)
+                            .font(CLTheme.calloutFont.weight(.medium))
                             .foregroundStyle(CLTheme.accentBlue)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(CLTheme.lightBlue.opacity(0.5))
+                            .clipShape(Capsule())
+                            .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity)
 
@@ -45,7 +50,7 @@ struct CaregiverProfileEditView: View {
                                 .frame(minHeight: 120)
                                 .padding(CLTheme.spacingSM)
                                 .background(CLTheme.backgroundSecondary)
-                                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                                .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
                         }
                     }
 
@@ -85,8 +90,8 @@ struct CaregiverProfileEditView: View {
             }
             .padding(CLTheme.spacingMD)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-            .shadow(color: CLTheme.shadowLight, radius: 4)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            .shadow(color: CLTheme.shadowLight, radius: 6, y: 2)
             .padding(.horizontal, CLTheme.spacingMD)
         }
     }

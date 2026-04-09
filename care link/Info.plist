@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CareLink uses Face ID so you can sign in quickly and keep your account private on this device.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>CareLink adds your bookings to Calendar with reminders so you do not miss visits.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CareLink uses your location to show nearby caregivers and center the map around you.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

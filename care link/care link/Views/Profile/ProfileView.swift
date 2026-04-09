@@ -139,9 +139,10 @@ struct ProfileView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, CLTheme.spacingMD)
             .background(CLTheme.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
-            .shadow(color: CLTheme.shadowLight, radius: 4)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            .shadow(color: CLTheme.shadowLight, radius: 8, y: 2)
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Connections

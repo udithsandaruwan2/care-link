@@ -2,9 +2,17 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.scenePhase) private var scenePhase
+
+    private var shouldShowBiometricLockOverlay: Bool {
+        appState.isAuthenticated
+            && appState.isBiometricAppLocked
+            && appState.shouldUseBiometricAppLock()
+    }
 
     var body: some View {
-        Group {
+        ZStack {
+            Group {
             if appState.isAuthenticated {
                 if appState.needsProfileSetup {
                     NewUserSetupView()
@@ -42,6 +50,14 @@ struct ContentView: View {
                         removal: .move(edge: .leading)
                     ))
             }
+            }
+
+            if shouldShowBiometricLockOverlay {
+                BiometricLockScreenView()
+                    .environment(appState)
+                    .transition(.opacity)
+                    .zIndex(1000)
+            }
         }
         .animation(.easeInOut(duration: 0.4), value: appState.isAuthenticated)
         .animation(.easeInOut(duration: 0.4), value: appState.showWelcome)
@@ -50,6 +66,11 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.4), value: appState.needsProfileSetup)
         .onAppear {
             appState.checkAuthState()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .inactive || phase == .background {
+                appState.lockAppForBiometricsIfNeeded()
+            }
         }
     }
 }

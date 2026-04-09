@@ -278,7 +278,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "CareLink can add your bookings to your calendar for easy scheduling.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your identity to access your private health records.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CareLink needs your location to find nearby caregivers.";
@@ -313,7 +313,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "CareLink can add your bookings to your calendar for easy scheduling.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your identity to access your private health records.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CareLink needs your location to find nearby caregivers.";
