@@ -33,6 +33,12 @@ struct HomeView: View {
                             .foregroundStyle(CLTheme.textPrimary)
                             .padding(.horizontal, CLTheme.spacingMD)
                             .padding(.top, CLTheme.spacingSM)
+                        if !viewModel.recommendedCaregivers.isEmpty {
+                            Text("Ranked for you using on-device intelligence")
+                                .font(CLTheme.captionFont)
+                                .foregroundStyle(CLTheme.textTertiary)
+                                .padding(.horizontal, CLTheme.spacingMD)
+                        }
 
                         searchBar
                         filterChips
@@ -68,8 +74,13 @@ struct HomeView: View {
             }
             .task {
                 await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
+                let history = await loadBookingHistory()
+                viewModel.updateRecommendations(
+                    recommendationService: appState.coreMLRecommendationService,
+                    bookingHistory: history
+                )
                 await loadActiveConnection()
-                await loadActiveBookingCard()
+                await loadActiveBookingCard(from: history)
             }
             .onChange(of: appState.navigationResetToken) { _, _ in
                 navigationPath = NavigationPath()
@@ -415,11 +426,20 @@ struct HomeView: View {
     }
 
     /// Latest confirmed / in-progress booking drives the home hero when present.
-    private func loadActiveBookingCard() async {
+    private func loadBookingHistory() async -> [Booking] {
         let userId = appState.authService.currentUser?.uid ?? ""
-        guard !userId.isEmpty else { return }
-        let list = (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
-        let match = list.first { $0.status == .confirmed || $0.status == .inProgress }
+        guard !userId.isEmpty else { return [] }
+        return (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
+    }
+
+    private func loadActiveBookingCard(from list: [Booking]? = nil) async {
+        let loaded: [Booking]
+        if let list {
+            loaded = list
+        } else {
+            loaded = await loadBookingHistory()
+        }
+        let match = loaded.first { $0.status == .confirmed || $0.status == .inProgress }
         activeBooking = match
         if let b = match {
             bookingCaregiver = try? await appState.firestoreService.fetchCaregiver(id: b.caregiverId)

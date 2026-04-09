@@ -5,6 +5,7 @@ final class HomeViewModel {
     var caregivers: [Caregiver] = []
     var filteredCaregivers: [Caregiver] = []
     var recommendedCaregivers: [Caregiver] = []
+    var bookingHistory: [Booking] = []
     var searchText = ""
     var selectedCategory: Caregiver.CareCategory = .all
     var isLoading = false
@@ -37,17 +38,29 @@ final class HomeViewModel {
                 $0.specialty.localizedCaseInsensitiveContains(searchText)
             }
         }
+
+        if !recommendedCaregivers.isEmpty {
+            let rankIndexById = Dictionary(uniqueKeysWithValues: recommendedCaregivers.enumerated().map { ($1.id, $0) })
+            filteredCaregivers.sort {
+                (rankIndexById[$0.id] ?? Int.max) < (rankIndexById[$1.id] ?? Int.max)
+            }
+        }
     }
 
     func updateRecommendations(
-        recommendationService: RecommendationService,
+        recommendationService: CoreMLRecommendationService,
         bookingHistory: [Booking] = []
     ) {
-        recommendedCaregivers = recommendationService.getRecommendedCaregivers(
-            from: caregivers,
-            userPreferredCategory: selectedCategory != .all ? selectedCategory : nil,
-            bookingHistory: bookingHistory
+        self.bookingHistory = bookingHistory
+        recommendedCaregivers = recommendationService.rankCaregivers(
+            caregivers,
+            context: CaregiverRecommendationContext(
+                preferredCategory: selectedCategory != .all ? selectedCategory : nil,
+                maxBudget: nil,
+                bookingHistory: bookingHistory
+            )
         )
+        applyFilters()
     }
 
     func selectCategory(_ category: Caregiver.CareCategory) {

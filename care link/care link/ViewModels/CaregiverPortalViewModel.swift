@@ -7,6 +7,7 @@ final class CaregiverPortalViewModel {
     var upcomingAppointments: [Booking] = []
     var completedAppointments: [Booking] = []
     var caregiverProfile: Caregiver?
+    var riskByBookingId: [String: BookingRiskAssessment] = [:]
     var isLoading = false
     var errorMessage: String?
 
@@ -19,13 +20,18 @@ final class CaregiverPortalViewModel {
         completedAppointments.reduce(0) { $0 + $1.totalCost }
     }
 
-    func loadAppointments(caregiverId: String, firestoreService: FirestoreService) async {
+    func loadAppointments(
+        caregiverId: String,
+        firestoreService: FirestoreService,
+        riskService: CoreMLBookingRiskService
+    ) async {
         isLoading = true
         defer { isLoading = false }
 
         do {
             appointments = try await firestoreService.fetchCaregiverBookings(for: caregiverId)
             categorizeAppointments()
+            updatePendingRiskAssessments(riskService: riskService)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -37,6 +43,15 @@ final class CaregiverPortalViewModel {
         completedAppointments = appointments.filter { $0.status == .completed }
     }
 
+    private func updatePendingRiskAssessments(riskService: CoreMLBookingRiskService) {
+        var map: [String: BookingRiskAssessment] = [:]
+        for pending in pendingRequests {
+            let history = appointments.filter { $0.userId == pending.userId && $0.id != pending.id }
+            map[pending.id] = riskService.assessRisk(booking: pending, userHistory: history)
+        }
+        riskByBookingId = map
+    }
+
     func acceptBooking(bookingId: String, firestoreService: FirestoreService) async {
         do {
             try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .confirmed)
@@ -44,6 +59,7 @@ final class CaregiverPortalViewModel {
                 appointments[index].status = .confirmed
             }
             categorizeAppointments()
+            riskByBookingId.removeValue(forKey: bookingId)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -56,6 +72,7 @@ final class CaregiverPortalViewModel {
                 appointments[index].status = .cancelled
             }
             categorizeAppointments()
+            riskByBookingId.removeValue(forKey: bookingId)
         } catch {
             errorMessage = error.localizedDescription
         }

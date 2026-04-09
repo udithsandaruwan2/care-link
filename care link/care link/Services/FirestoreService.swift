@@ -232,6 +232,31 @@ final class FirestoreService {
         }
     }
 
+    // MARK: - Family Members
+
+    func addFamilyMember(_ member: FamilyMember) async throws {
+        try await encodeAndSet(member, at: db.collection("familyMembers").document(member.id))
+    }
+
+    func fetchFamilyMembers(for ownerUserId: String) async throws -> [FamilyMember] {
+        let snapshot = try await db.collection("familyMembers")
+            .whereField("ownerUserId", isEqualTo: ownerUserId)
+            .order(by: "createdAt", descending: true)
+            .getDocuments()
+
+        return snapshot.documents.compactMap { doc in
+            try? doc.data(as: FamilyMember.self)
+        }
+    }
+
+    func updateFamilyMember(_ member: FamilyMember) async throws {
+        try await encodeAndSet(member, at: db.collection("familyMembers").document(member.id), merge: true)
+    }
+
+    func deleteFamilyMember(memberId: String) async throws {
+        try await db.collection("familyMembers").document(memberId).delete()
+    }
+
     // MARK: - Users
 
     func fetchUser(_ userId: String) async throws -> CLUser? {

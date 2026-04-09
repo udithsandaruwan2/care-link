@@ -7,6 +7,7 @@ struct BookingDetailsView: View {
     let caregiver: Caregiver
     @State private var viewModel = BookingViewModel()
     @State private var showConfirmation = false
+    @State private var bookingHistory: [Booking] = []
 
     private let popularDurations = ["Morning (4h)", "Afternoon (3h)", "Full Day (8h)"]
 
@@ -61,6 +62,13 @@ struct BookingDetailsView: View {
                     .environment(appState)
             }
         }
+        .task {
+            await loadRiskContext()
+        }
+        .onChange(of: viewModel.selectedDate) { _, _ in recomputeRisk() }
+        .onChange(of: viewModel.startTime) { _, _ in recomputeRisk() }
+        .onChange(of: viewModel.endTime) { _, _ in recomputeRisk() }
+        .onChange(of: viewModel.selectedPaymentMethod) { _, _ in recomputeRisk() }
         .alert("Booking", isPresented: $viewModel.showError) {
             Button("OK") {}
         } message: {
@@ -169,12 +177,27 @@ struct BookingDetailsView: View {
     }
 
     private var durationInfo: some View {
-        HStack(spacing: CLTheme.spacingSM) {
-            Image(systemName: "info.circle.fill")
-                .foregroundStyle(CLTheme.accentBlue)
-            Text("Total duration: \(String(format: "%.1f", viewModel.duration)) hours")
-                .font(CLTheme.calloutFont)
-                .foregroundStyle(CLTheme.accentBlue)
+        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+            HStack(spacing: CLTheme.spacingSM) {
+                Image(systemName: "info.circle.fill")
+                    .foregroundStyle(CLTheme.accentBlue)
+                Text("Total duration: \(String(format: "%.1f", viewModel.duration)) hours")
+                    .font(CLTheme.calloutFont)
+                    .foregroundStyle(CLTheme.accentBlue)
+            }
+            if let risk = viewModel.riskAssessment {
+                HStack(spacing: 8) {
+                    Image(systemName: risk.level == .high ? "exclamationmark.triangle.fill" : "shield.lefthalf.filled")
+                        .foregroundStyle(riskColor(risk.level))
+                    Text("\(risk.shortText) for this slot")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(riskColor(risk.level))
+                    Spacer(minLength: 0)
+                    Text(risk.source == "coreml" ? "Core ML" : "Fallback")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CLTheme.textTertiary)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(CLTheme.spacingMD)
@@ -294,6 +317,14 @@ struct BookingDetailsView: View {
                     guard !userId.isEmpty else { return }
                     let patientName = appState.authService.userProfile?.fullName ?? "Patient"
                     let patientAddress = appState.authService.userProfile?.address ?? ""
+                    viewModel.updateRiskAssessment(
+                        caregiver: caregiver,
+                        userId: userId,
+                        patientName: patientName,
+                        patientAddress: patientAddress,
+                        userHistory: bookingHistory,
+                        riskService: appState.coreMLBookingRiskService
+                    )
                     let success = await viewModel.confirmBooking(
                         caregiver: caregiver,
                         userId: userId,
@@ -315,6 +346,35 @@ struct BookingDetailsView: View {
         .padding(.horizontal, CLTheme.spacingLG)
         .padding(.top, CLTheme.spacingMD)
         .padding(.bottom, CLTheme.spacingSM)
+    }
+
+    private func loadRiskContext() async {
+        let userId = appState.authService.currentUser?.uid ?? ""
+        guard !userId.isEmpty else { return }
+        await viewModel.loadUserBookings(userId: userId, firestoreService: appState.firestoreService)
+        bookingHistory = viewModel.userBookings
+        recomputeRisk()
+    }
+
+    private func recomputeRisk() {
+        let userId = appState.authService.currentUser?.uid ?? ""
+        guard !userId.isEmpty else { return }
+        viewModel.updateRiskAssessment(
+            caregiver: caregiver,
+            userId: userId,
+            patientName: appState.authService.userProfile?.fullName ?? "Patient",
+            patientAddress: appState.authService.userProfile?.address ?? "",
+            userHistory: bookingHistory,
+            riskService: appState.coreMLBookingRiskService
+        )
+    }
+
+    private func riskColor(_ level: BookingRiskAssessment.Level) -> Color {
+        switch level {
+        case .low: return CLTheme.successGreen
+        case .medium: return CLTheme.warningOrange
+        case .high: return CLTheme.errorRed
+        }
     }
 }
 

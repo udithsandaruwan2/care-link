@@ -30,6 +30,8 @@ final class AppState {
     let locationService = LocationService()
     let eventKitService = EventKitService()
     let recommendationService = RecommendationService()
+    let coreMLRecommendationService = CoreMLRecommendationService()
+    let coreMLBookingRiskService = CoreMLBookingRiskService()
 
     func checkAuthState() {
         authService.checkCurrentUser()

@@ -6,6 +6,8 @@ struct ProfileView: View {
     @State private var showSettings = false
     @State private var showEditProfile = false
     @State private var showMedicalRecords = false
+    @State private var showFamilyMembers = false
+    @State private var showPaymentMethods = false
     @State private var bookings: [Booking] = []
     @State private var connections: [Connection] = []
 
@@ -14,15 +16,16 @@ struct ProfileView: View {
             ScrollView {
                 VStack(spacing: CLTheme.spacingLG) {
                     profileHeader
-                    quickActions
-                    connectionSection
-                    bookingHistorySection
+                    quickStats
+                    accountSection
+                    supportSection
+                    signOutSection
                 }
                 .padding(.bottom, 100)
             }
             .background(CLTheme.backgroundPrimary)
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("CareLink")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -39,6 +42,14 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showEditProfile) {
                 EditProfileView()
+                    .environment(appState)
+            }
+            .navigationDestination(isPresented: $showFamilyMembers) {
+                FamilyMembersView()
+                    .environment(appState)
+            }
+            .navigationDestination(isPresented: $showPaymentMethods) {
+                PaymentMethodsView()
                     .environment(appState)
             }
             .navigationDestination(isPresented: $showMedicalRecords) {
@@ -100,161 +111,147 @@ struct ProfileView: View {
         .padding(.top, CLTheme.spacingLG)
     }
 
-    private var quickActions: some View {
+    private var quickStats: some View {
         HStack(spacing: CLTheme.spacingMD) {
-            quickActionButton(icon: "calendar", title: "Bookings", count: bookings.count) {}
-            quickActionButton(icon: "link.circle", title: "Connections", count: connections.filter { $0.status == .approved }.count) {}
-            quickActionButton(icon: "doc.text", title: "Records", count: 0) {
-                showMedicalRecords = true
-            }
+            statTile(
+                title: "ACTIVE",
+                subtitle: "CONNECTIONS",
+                value: String(format: "%02d", connections.filter { $0.status == .approved }.count),
+                highlighted: false
+            )
+            statTile(
+                title: "HEALTH",
+                subtitle: "SCORE",
+                value: "\(min(99, 70 + bookings.count * 2))%",
+                highlighted: true
+            )
         }
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
-    private func quickActionButton(icon: String, title: String, count: Int, action: @escaping () -> Void) -> some View {
+    private func statTile(title: String, subtitle: String, value: String, highlighted: Bool) -> some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+            Text(title)
+                .font(CLTheme.smallFont)
+                .tracking(1)
+                .foregroundStyle(highlighted ? .white.opacity(0.8) : CLTheme.tealAccent)
+            Text(subtitle)
+                .font(CLTheme.smallFont)
+                .tracking(1)
+                .foregroundStyle(highlighted ? .white.opacity(0.8) : CLTheme.tealAccent)
+            Text(value)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(highlighted ? .white : CLTheme.textPrimary)
+            if highlighted {
+                Capsule()
+                    .fill(.white.opacity(0.8))
+                    .frame(height: 3)
+                    .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(CLTheme.spacingMD)
+        .background(highlighted ? AnyShapeStyle(CLTheme.gradientBlue) : AnyShapeStyle(CLTheme.cardBackground))
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+        .shadow(color: CLTheme.shadowLight, radius: 8, y: 3)
+    }
+
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            Text("Account Settings")
+                .font(CLTheme.title2Font)
+                .foregroundStyle(CLTheme.textPrimary)
+                .padding(.horizontal, CLTheme.spacingMD)
+
+            VStack(spacing: CLTheme.spacingSM) {
+                profileMenuRow(icon: "person", title: "Edit Profile", subtitle: "Update your personal details") {
+                    showEditProfile = true
+                }
+                profileMenuRow(icon: "person.3", title: "Family Members", subtitle: "Manage your care circle profiles") {
+                    showFamilyMembers = true
+                }
+                profileMenuRow(icon: "creditcard", title: "Payment Methods", subtitle: "Manage cards and billing") {
+                    showPaymentMethods = true
+                }
+                profileMenuRow(icon: "doc.text", title: "Medical Records", subtitle: "View your health records") {
+                    showMedicalRecords = true
+                }
+            }
+            .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private var supportSection: some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            Text("Support")
+                .font(CLTheme.title2Font)
+                .foregroundStyle(CLTheme.textPrimary)
+                .padding(.horizontal, CLTheme.spacingMD)
+
+            VStack(spacing: CLTheme.spacingSM) {
+                profileMenuRow(icon: "questionmark.circle", title: "Help & Support", subtitle: "FAQs and contact support") {}
+                profileMenuRow(icon: "lock.shield", title: "Privacy Policy", subtitle: "Terms and data usage") {}
+            }
+            .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private var signOutSection: some View {
+        VStack(spacing: CLTheme.spacingMD) {
+            Button {
+                appState.signOut()
+            } label: {
+                HStack(spacing: CLTheme.spacingMD) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .foregroundStyle(CLTheme.errorRed)
+                    Text("Sign Out")
+                        .font(CLTheme.headlineFont)
+                        .foregroundStyle(CLTheme.errorRed)
+                    Spacer()
+                }
+                .padding(CLTheme.spacingMD)
+                .background(CLTheme.errorRed.opacity(0.08))
+                .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, CLTheme.spacingMD)
+
+            Text("CARELINK VERSION 2.4.0")
+                .font(CLTheme.captionFont)
+                .foregroundStyle(CLTheme.textTertiary)
+        }
+    }
+
+    private func profileMenuRow(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(spacing: CLTheme.spacingSM) {
-                ZStack(alignment: .topTrailing) {
+                HStack(spacing: CLTheme.spacingMD) {
                     Image(systemName: icon)
-                        .font(.system(size: 22))
-                        .foregroundStyle(CLTheme.accentBlue)
-                        .frame(width: 50, height: 50)
-                        .background(CLTheme.lightBlue)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(CLTheme.primaryNavy)
+                        .frame(width: 34, height: 34)
+                        .background(CLTheme.backgroundSecondary)
                         .clipShape(Circle())
-
-                    if count > 0 {
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 18, height: 18)
-                            .background(CLTheme.errorRed)
-                            .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(CLTheme.headlineFont)
+                            .foregroundStyle(CLTheme.textPrimary)
+                        Text(subtitle)
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textSecondary)
                     }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(CLTheme.textTertiary)
                 }
-
-                Text(title)
-                    .font(CLTheme.captionFont)
-                    .foregroundStyle(CLTheme.textSecondary)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, CLTheme.spacingMD)
+            .padding(CLTheme.spacingMD)
             .background(CLTheme.cardBackground)
             .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
             .shadow(color: CLTheme.shadowLight, radius: 8, y: 2)
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Connections
-
-    @ViewBuilder
-    private var connectionSection: some View {
-        let activeConnections = connections.filter { $0.status == .approved }
-        if !activeConnections.isEmpty {
-            VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
-                Text("Connected Caregivers")
-                    .font(CLTheme.title2Font)
-                    .foregroundStyle(CLTheme.textPrimary)
-                    .padding(.horizontal, CLTheme.spacingMD)
-
-                ForEach(activeConnections) { connection in
-                    CLCard {
-                        HStack(spacing: CLTheme.spacingMD) {
-                            Circle()
-                                .fill(CLTheme.successGreen.opacity(0.12))
-                                .frame(width: 44, height: 44)
-                                .overlay {
-                                    Text(String(connection.caregiverName.prefix(2)).uppercased())
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(CLTheme.successGreen)
-                                }
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(connection.caregiverName)
-                                    .font(CLTheme.headlineFont)
-                                    .foregroundStyle(CLTheme.textPrimary)
-                                Text(connection.caregiverSpecialty)
-                                    .font(CLTheme.captionFont)
-                                    .foregroundStyle(CLTheme.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "checkmark.seal.fill")
-                                .foregroundStyle(CLTheme.successGreen)
-                        }
-                    }
-                    .padding(.horizontal, CLTheme.spacingMD)
-                }
-            }
-        }
-    }
-
-    // MARK: - Booking History
-
-    private var bookingHistorySection: some View {
-        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
-            HStack {
-                Text("Recent Bookings")
-                    .font(CLTheme.title2Font)
-                    .foregroundStyle(CLTheme.textPrimary)
-                Spacer()
-            }
-            .padding(.horizontal, CLTheme.spacingMD)
-
-            if bookings.isEmpty {
-                VStack(spacing: CLTheme.spacingMD) {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 40))
-                        .foregroundStyle(CLTheme.textTertiary)
-                    Text("No bookings yet")
-                        .font(CLTheme.headlineFont)
-                        .foregroundStyle(CLTheme.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, CLTheme.spacingXL)
-            } else {
-                ForEach(bookings.prefix(5)) { booking in
-                    bookingRow(booking)
-                }
-            }
-        }
-    }
-
-    private func bookingRow(_ booking: Booking) -> some View {
-        CLCard {
-            HStack(spacing: CLTheme.spacingMD) {
-                Circle()
-                    .fill(CLTheme.primaryNavy.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Text(String(booking.caregiverName.prefix(2)).uppercased())
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(CLTheme.primaryNavy)
-                    }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(booking.caregiverName)
-                        .font(CLTheme.headlineFont)
-                        .foregroundStyle(CLTheme.textPrimary)
-                    Text(booking.date.formatted(date: .abbreviated, time: .omitted))
-                        .font(CLTheme.captionFont)
-                        .foregroundStyle(CLTheme.textSecondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(booking.status.rawValue)
-                        .font(CLTheme.captionFont)
-                        .foregroundStyle(Color(hex: booking.status.color))
-                    Text("$\(String(format: "%.2f", booking.totalCost))")
-                        .font(CLTheme.calloutFont)
-                        .foregroundStyle(CLTheme.textPrimary)
-                }
-            }
-        }
-        .padding(.horizontal, CLTheme.spacingMD)
     }
 }
 

@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var notificationsEnabled = true
     @State private var biometricEnabled = false
     @State private var isSyncingBiometricToggle = false
+    @State private var didInitializeBiometricToggle = false
     @State private var showBiometricInfoAlert = false
     @State private var biometricInfoMessage = ""
     @State private var fontSize: Double = 16
@@ -186,10 +187,14 @@ struct SettingsView: View {
                 appState.biometricService.checkAvailability()
                 let localEnabled = UserDefaults.standard.bool(forKey: AppState.biometricAppUnlockPreferenceKey)
                 let profileEnabled = appState.authService.userProfile?.isBiometricEnabled == true
-                biometricEnabled = localEnabled && profileEnabled
+                setBiometricToggle(localEnabled && profileEnabled)
+                didInitializeBiometricToggle = true
             }
             .onChange(of: biometricEnabled) { _, newValue in
-                guard !isSyncingBiometricToggle else { return }
+                guard didInitializeBiometricToggle, !isSyncingBiometricToggle else { return }
+                let currentlyEnabled = UserDefaults.standard.bool(forKey: AppState.biometricAppUnlockPreferenceKey)
+                    && appState.authService.userProfile?.isBiometricEnabled == true
+                guard newValue != currentlyEnabled else { return }
                 Task {
                     if newValue {
                         await handleEnableBiometricToggle()

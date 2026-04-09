@@ -11,6 +11,7 @@ final class BookingViewModel {
     var isLoading = false
     var bookingConfirmed = false
     var confirmedBooking: Booking?
+    var riskAssessment: BookingRiskAssessment?
     var errorMessage: String?
     var showError = false
 
@@ -43,20 +44,15 @@ final class BookingViewModel {
         }
     }
 
-    func confirmBooking(
+    func draftBooking(
         caregiver: Caregiver,
         userId: String,
         patientName: String,
-        patientAddress: String,
-        firestoreService: FirestoreService,
-        chatService: ChatService
-    ) async -> Bool {
-        isLoading = true
-        defer { isLoading = false }
-
+        patientAddress: String
+    ) -> Booking {
         let bookingId = "bk_\(UUID().uuidString.prefix(8).lowercased())"
         let addr = patientAddress.trimmingCharacters(in: .whitespaces)
-        let booking = Booking(
+        return Booking(
             id: bookingId,
             userId: userId,
             patientName: patientName,
@@ -75,6 +71,42 @@ final class BookingViewModel {
             address: addr.isEmpty ? "Address on file" : addr,
             paymentMethod: selectedPaymentMethod,
             createdAt: Date()
+        )
+    }
+
+    func updateRiskAssessment(
+        caregiver: Caregiver,
+        userId: String,
+        patientName: String,
+        patientAddress: String,
+        userHistory: [Booking],
+        riskService: CoreMLBookingRiskService
+    ) {
+        let booking = draftBooking(
+            caregiver: caregiver,
+            userId: userId,
+            patientName: patientName,
+            patientAddress: patientAddress
+        )
+        riskAssessment = riskService.assessRisk(booking: booking, userHistory: userHistory)
+    }
+
+    func confirmBooking(
+        caregiver: Caregiver,
+        userId: String,
+        patientName: String,
+        patientAddress: String,
+        firestoreService: FirestoreService,
+        chatService: ChatService
+    ) async -> Bool {
+        isLoading = true
+        defer { isLoading = false }
+
+        let booking = draftBooking(
+            caregiver: caregiver,
+            userId: userId,
+            patientName: patientName,
+            patientAddress: patientAddress
         )
 
         do {

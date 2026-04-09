@@ -476,6 +476,25 @@ struct CaregiverDashboardView: View {
                         .clipShape(Capsule())
                 }
 
+                if booking.status.needsCaregiverAction,
+                   let risk = viewModel.riskByBookingId[booking.id] {
+                    HStack(spacing: 6) {
+                        Image(systemName: risk.level == .high ? "exclamationmark.triangle.fill" : "shield.lefthalf.filled")
+                            .font(.system(size: 11))
+                        Text(risk.shortText)
+                            .font(.system(size: 11, weight: .semibold))
+                        Spacer(minLength: 0)
+                        Text(risk.source == "coreml" ? "Core ML" : "Fallback")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(CLTheme.textTertiary)
+                    }
+                    .foregroundStyle(riskColor(risk.level))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(riskColor(risk.level).opacity(0.1))
+                    .clipShape(Capsule())
+                }
+
                 HStack(spacing: CLTheme.spacingMD) {
                     Label(booking.startTime.formatted(date: .omitted, time: .shortened), systemImage: "clock")
                         .font(CLTheme.captionFont)
@@ -535,7 +554,11 @@ struct CaregiverDashboardView: View {
 
     private func loadDashboardData() async {
         let caregiverId = appState.authService.currentUser?.uid ?? ""
-        async let appointmentsTask: () = viewModel.loadAppointments(caregiverId: caregiverId, firestoreService: appState.firestoreService)
+        async let appointmentsTask: () = viewModel.loadAppointments(
+            caregiverId: caregiverId,
+            firestoreService: appState.firestoreService,
+            riskService: appState.coreMLBookingRiskService
+        )
         async let patientsTask: () = {
             self.connectedPatients = (try? await appState.firestoreService.fetchConnectedPatients(caregiverId: caregiverId)) ?? []
         }()
@@ -544,6 +567,14 @@ struct CaregiverDashboardView: View {
         }()
         _ = await (appointmentsTask, patientsTask, pendingTask)
         featuredBooking = viewModel.upcomingAppointments.min(by: { $0.date == $1.date ? $0.startTime < $1.startTime : $0.date < $1.date })
+    }
+
+    private func riskColor(_ level: BookingRiskAssessment.Level) -> Color {
+        switch level {
+        case .low: return CLTheme.successGreen
+        case .medium: return CLTheme.warningOrange
+        case .high: return CLTheme.errorRed
+        }
     }
 
     private func approveConnection(_ connection: Connection) async {
