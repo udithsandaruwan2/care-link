@@ -111,6 +111,10 @@ final class BookingViewModel {
 
         do {
             try await firestoreService.createBooking(booking)
+            try? await firestoreService.upsertConnectionForBooking(
+                booking: booking,
+                status: .pending
+            )
             let conversation = try await chatService.getOrCreateConversation(
                 userId: userId,
                 userName: patientName,

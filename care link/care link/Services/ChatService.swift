@@ -24,13 +24,28 @@ final class ChatService {
         isListeningConversations = true
 
         let field = role == .user ? "userId" : "caregiverId"
-        conversationListener = db.collection("conversations")
-            .whereField(field, isEqualTo: userId)
+        let baseQuery = db.collection("conversations").whereField(field, isEqualTo: userId)
+        conversationListener = baseQuery
             .order(by: "lastMessageAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self, let snapshot else { return }
-                self.conversations = snapshot.documents.compactMap { doc in
-                    try? doc.data(as: ChatConversation.self)
+                guard let self else { return }
+                if let snapshot {
+                    self.conversations = snapshot.documents.compactMap { doc in
+                        try? doc.data(as: ChatConversation.self)
+                    }
+                    return
+                }
+                // If Firestore cannot serve the ordered query (e.g. missing index), fallback to base query
+                // and sort locally so chat keeps working in real-time.
+                if error != nil {
+                    self.conversationListener?.remove()
+                    self.conversationListener = baseQuery.addSnapshotListener { [weak self] fallbackSnapshot, _ in
+                        guard let self, let fallbackSnapshot else { return }
+                        self.conversations = fallbackSnapshot.documents.compactMap { doc in
+                            try? doc.data(as: ChatConversation.self)
+                        }
+                        .sorted { $0.lastMessageAt > $1.lastMessageAt }
+                    }
                 }
             }
     }
@@ -93,10 +108,11 @@ final class ChatService {
             .document(messageId)
             .setData(data)
 
-        try await db.collection("conversations").document(conversationId).updateData([
-            "lastMessage": text,
-            "lastMessageAt": Timestamp(date: Date())
-        ])
+        try await updateConversationAfterSend(
+            conversationId: conversationId,
+            senderId: senderId,
+            lastMessage: text
+        )
     }
 
     /// Sends a structured booking request bubble (caregiver can accept/decline from chat).
@@ -127,10 +143,11 @@ final class ChatService {
             .document(messageId)
             .setData(data)
 
-        try await db.collection("conversations").document(conversationId).updateData([
-            "lastMessage": preview,
-            "lastMessageAt": Timestamp(date: Date())
-        ])
+        try await updateConversationAfterSend(
+            conversationId: conversationId,
+            senderId: senderId,
+            lastMessage: preview
+        )
     }
 
     // MARK: - Create Conversation
@@ -188,11 +205,39 @@ final class ChatService {
                 try? await doc.reference.updateData(["isRead": true])
             }
         }
+        if let conversation = try? await fetchConversation(conversationId: conversationId) {
+            let unreadField = readerId == conversation.userId ? "unreadCountUser" : "unreadCountCaregiver"
+            try? await db.collection("conversations").document(conversationId).updateData([unreadField: 0])
+        }
     }
 
     func unreadCount(for userId: String, role: CLUser.UserRole) -> Int {
         conversations.reduce(0) { total, conv in
             total + (role == .user ? conv.unreadCountUser : conv.unreadCountCaregiver)
         }
+    }
+
+    // MARK: - Helpers
+
+    private func fetchConversation(conversationId: String) async throws -> ChatConversation {
+        let document = try await db.collection("conversations").document(conversationId).getDocument()
+        guard let conversation = try? document.data(as: ChatConversation.self) else {
+            throw NSError(domain: "ChatService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Conversation not found"])
+        }
+        return conversation
+    }
+
+    private func updateConversationAfterSend(
+        conversationId: String,
+        senderId: String,
+        lastMessage: String
+    ) async throws {
+        let conversation = try await fetchConversation(conversationId: conversationId)
+        let unreadField = senderId == conversation.userId ? "unreadCountCaregiver" : "unreadCountUser"
+        try await db.collection("conversations").document(conversationId).updateData([
+            "lastMessage": lastMessage,
+            "lastMessageAt": Timestamp(date: Date()),
+            unreadField: FieldValue.increment(Int64(1))
+        ])
     }
 }

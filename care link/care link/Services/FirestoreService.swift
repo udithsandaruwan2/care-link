@@ -4,6 +4,7 @@ import FirebaseFirestore
 @Observable
 final class FirestoreService {
     private var db: Firestore { Firestore.firestore() }
+    private var userBookingsListener: ListenerRegistration?
 
     private func encodeAndSet<T: Encodable>(_ value: T, at ref: DocumentReference, merge: Bool = false) async throws {
         let data = try Firestore.Encoder().encode(value)
@@ -87,6 +88,45 @@ final class FirestoreService {
         return snapshot.documents.compactMap { doc in
             try? doc.data(as: Booking.self)
         }
+    }
+
+    // MARK: - Realtime Bookings
+
+    func listenToBookingsForUser(
+        _ userId: String,
+        onUpdate: @escaping ([Booking]) -> Void
+    ) {
+        stopListeningToBookingsForUser()
+        guard !userId.isEmpty else {
+            onUpdate([])
+            return
+        }
+
+        let baseQuery = db.collection("bookings").whereField("userId", isEqualTo: userId)
+        userBookingsListener = baseQuery
+            .order(by: "createdAt", descending: true)
+            .addSnapshotListener { [weak self] snapshot, error in
+                if let snapshot {
+                    let bookings = snapshot.documents.compactMap { try? $0.data(as: Booking.self) }
+                    onUpdate(bookings)
+                    return
+                }
+                // Avoid clearing UI state on transient/index errors; fallback to base query and local sorting.
+                if error != nil {
+                    self?.userBookingsListener?.remove()
+                    self?.userBookingsListener = baseQuery.addSnapshotListener { fallbackSnapshot, _ in
+                        guard let fallbackSnapshot else { return }
+                        let bookings = fallbackSnapshot.documents.compactMap { try? $0.data(as: Booking.self) }
+                            .sorted { $0.createdAt > $1.createdAt }
+                        onUpdate(bookings)
+                    }
+                }
+            }
+    }
+
+    func stopListeningToBookingsForUser() {
+        userBookingsListener?.remove()
+        userBookingsListener = nil
     }
 
     func fetchCaregiverBookings(for caregiverId: String) async throws -> [Booking] {
@@ -201,6 +241,28 @@ final class FirestoreService {
             .getDocuments()
 
         return snapshot.documents.first.flatMap { try? $0.data(as: Connection.self) }
+    }
+
+    func upsertConnectionForBooking(
+        booking: Booking,
+        status: Connection.ConnectionStatus
+    ) async throws {
+        if let existing = try await checkExistingConnection(userId: booking.userId, caregiverId: booking.caregiverId) {
+            try await updateConnectionStatus(connectionId: existing.id, status: status)
+            return
+        }
+
+        let newConnection = Connection(
+            id: "conn_\(UUID().uuidString.prefix(10).lowercased())",
+            userId: booking.userId,
+            userName: booking.patientName.isEmpty ? "Patient" : booking.patientName,
+            caregiverId: booking.caregiverId,
+            caregiverName: booking.caregiverName,
+            caregiverSpecialty: booking.caregiverSpecialty,
+            status: status,
+            createdAt: Date()
+        )
+        try await createConnection(newConnection)
     }
 
     // MARK: - Medical Records

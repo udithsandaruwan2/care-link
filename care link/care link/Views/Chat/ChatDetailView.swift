@@ -372,8 +372,20 @@ private struct BookingRequestChatCard: View {
             do {
                 if accept {
                     try await appState.firestoreService.updateBookingStatus(bookingId: bid, status: .confirmed)
+                    if let existingBooking = try? await appState.firestoreService.fetchBooking(bookingId: bid) {
+                        try? await appState.firestoreService.upsertConnectionForBooking(
+                            booking: existingBooking,
+                            status: .approved
+                        )
+                    }
                 } else {
                     try await appState.firestoreService.updateBookingStatus(bookingId: bid, status: .cancelled)
+                    if let existingBooking = try? await appState.firestoreService.fetchBooking(bookingId: bid) {
+                        try? await appState.firestoreService.upsertConnectionForBooking(
+                            booking: existingBooking,
+                            status: .rejected
+                        )
+                    }
                 }
                 booking = try? await appState.firestoreService.fetchBooking(bookingId: bid)
                 let note = accept ? "✅ Booking accepted." : "Booking declined."

@@ -1,4 +1,6 @@
 import SwiftUI
+import FirebaseAuth
+
 
 struct ChatListView: View {
     @Environment(AppState.self) private var appState
@@ -42,7 +44,16 @@ struct ChatListView: View {
                         .environment(appState)
                 }
             }
-            .onAppear { syncMainTabBarVisibility() }
+            .onAppear {
+                syncMainTabBarVisibility()
+                let userId = appState.authService.currentUser?.uid ?? ""
+                if !userId.isEmpty, !appState.chatService.isListeningConversations {
+                    appState.chatService.listenToConversations(
+                        userId: userId,
+                        role: appState.currentUserRole
+                    )
+                }
+            }
             .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
         }
     }

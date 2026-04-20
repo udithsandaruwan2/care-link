@@ -13,10 +13,15 @@ struct HomeView: View {
     @State private var connectedCaregiver: Caregiver?
     /// Shown when the user has an accepted booking (even without a separate “connection”).
     @State private var activeBooking: Booking?
+    @State private var pendingBooking: Booking?
     @State private var bookingCaregiver: Caregiver?
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
     @State private var showFilters = false
+    @State private var showCancelRequestConfirmation = false
+    @State private var isCancellingRequest = false
+    @State private var lastKnownCareBookingId: String?
+    @State private var isReconcilingBookingState = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -27,35 +32,39 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
                         greetingSection
                         yourCaregiverCard
-                        quickStatsRow
-
-                        Text("Available Caregivers")
-                            .font(CLTheme.title2Font)
-                            .foregroundStyle(CLTheme.textPrimary)
-                            .padding(.horizontal, CLTheme.spacingMD)
-                            .padding(.top, CLTheme.spacingSM)
-                        if !viewModel.recommendedCaregivers.isEmpty {
-                            Text("Ranked for you using on-device intelligence")
-                                .font(CLTheme.captionFont)
-                                .foregroundStyle(CLTheme.textTertiary)
-                                .padding(.horizontal, CLTheme.spacingMD)
-                        }
-
-                        searchBar
-                        filterChips
-
-                        if viewModel.isLoading {
-                            ForEach(0..<3, id: \.self) { _ in
-                                loadingCard
-                            }
-                        } else if viewModel.filteredCaregivers.isEmpty {
-                            emptyState
+                        if hasAssignedCaregiverDashboard {
+                            assignedCaregiverMonitoringSection
                         } else {
-                            caregiverList
-                        }
+                            quickStatsRow
 
-                        emergencyBanner
-                            .padding(.top, CLTheme.spacingSM)
+                            Text("Available Caregivers")
+                                .font(CLTheme.title2Font)
+                                .foregroundStyle(CLTheme.textPrimary)
+                                .padding(.horizontal, CLTheme.spacingMD)
+                                .padding(.top, CLTheme.spacingSM)
+                            if !viewModel.recommendedCaregivers.isEmpty {
+                                Text("Ranked for you using on-device intelligence")
+                                    .font(CLTheme.captionFont)
+                                    .foregroundStyle(CLTheme.textTertiary)
+                                    .padding(.horizontal, CLTheme.spacingMD)
+                            }
+
+                            searchBar
+                            filterChips
+
+                            if viewModel.isLoading {
+                                ForEach(0..<3, id: \.self) { _ in
+                                    loadingCard
+                                }
+                            } else if viewModel.filteredCaregivers.isEmpty {
+                                emptyState
+                            } else {
+                                caregiverList
+                            }
+
+                            emergencyBanner
+                                .padding(.top, CLTheme.spacingSM)
+                        }
                     }
                     .padding(.bottom, 100)
                 }
@@ -88,7 +97,26 @@ struct HomeView: View {
                 showCaregiverProfile = false
                 syncMainTabBarVisibility()
             }
+            .alert("Cancel Request", isPresented: $showCancelRequestConfirmation) {
+                Button("Keep Request", role: .cancel) {}
+                Button("Cancel Request", role: .destructive) {
+                    cancelCurrentBookingRequest()
+                }
+            } message: {
+                Text("This will cancel your current caregiver request.")
+            }
             .onAppear { syncMainTabBarVisibility() }
+            .onAppear {
+                let userId = appState.authService.currentUser?.uid ?? ""
+                appState.firestoreService.listenToBookingsForUser(userId) { bookings in
+                    Task { @MainActor in
+                        applyRealtimeBookingUpdate(bookings)
+                    }
+                }
+            }
+            .onDisappear {
+                appState.firestoreService.stopListeningToBookingsForUser()
+            }
             .onChange(of: showCaregiverProfile) { _, _ in syncMainTabBarVisibility() }
             .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
         }
@@ -97,6 +125,10 @@ struct HomeView: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var hasAssignedCaregiverDashboard: Bool {
+        heroBooking != nil || heroCaregiver != nil || pendingBooking != nil
     }
 
     private func syncMainTabBarVisibility() {
@@ -128,7 +160,7 @@ struct HomeView: View {
     }
 
     private var heroBooking: Booking? {
-        activeBooking
+        activeBooking ?? pendingBooking
     }
 
     private var heroConnection: Connection? {
@@ -137,16 +169,16 @@ struct HomeView: View {
 
     @ViewBuilder
     private var yourCaregiverCard: some View {
-        if let caregiver = heroCaregiver {
+        if let booking = heroBooking ?? activeBooking {
             VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
                 HStack {
-                    Text(heroBooking != nil ? "Your booked caregiver" : "Your Caregiver")
+                    Text("Your booked caregiver")
                         .font(CLTheme.title2Font)
                         .foregroundStyle(CLTheme.textPrimary)
                     Spacer()
                     HStack(spacing: 4) {
                         Circle().fill(CLTheme.successGreen).frame(width: 8, height: 8)
-                        Text(heroBooking != nil ? "Confirmed" : "Connected")
+                        Text("Confirmed")
                             .font(CLTheme.captionFont)
                             .foregroundStyle(CLTheme.successGreen)
                     }
@@ -154,41 +186,43 @@ struct HomeView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
                 VStack(spacing: 0) {
-                    if let b = heroBooking {
-                        HStack {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                            Text("\(b.date.formatted(date: .abbreviated, time: .omitted)) · \(b.startTime.formatted(date: .omitted, time: .shortened)) – \(b.endTime.formatted(date: .omitted, time: .shortened))")
-                                .font(CLTheme.captionFont)
-                            Spacer()
-                            Text("$\(String(format: "%.0f", b.totalCost))")
-                                .font(CLTheme.calloutFont)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundStyle(.white.opacity(0.9))
-                        .padding(.bottom, CLTheme.spacingSM)
+                    HStack {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12))
+                        Text("\(booking.date.formatted(date: .abbreviated, time: .omitted)) · \(booking.startTime.formatted(date: .omitted, time: .shortened)) – \(booking.endTime.formatted(date: .omitted, time: .shortened))")
+                            .font(CLTheme.captionFont)
+                        Spacer()
+                        Text("$\(String(format: "%.0f", booking.totalCost))")
+                            .font(CLTheme.calloutFont)
+                            .fontWeight(.semibold)
                     }
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.bottom, CLTheme.spacingSM)
 
                     HStack(spacing: CLTheme.spacingMD) {
-                        CaregiverAvatar(size: 65, imageURL: caregiver.imageURL, showVerified: caregiver.isVerified)
+                        CaregiverAvatar(
+                            size: 65,
+                            imageURL: heroCaregiver?.imageURL ?? booking.caregiverImageURL,
+                            showVerified: heroCaregiver?.isVerified ?? false
+                        )
 
                         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
-                            Text(caregiver.name)
+                            Text(heroCaregiver?.name ?? booking.caregiverName)
                                 .font(CLTheme.headlineFont)
                                 .foregroundStyle(.white)
-                            Text(caregiver.specialty)
+                            Text(heroCaregiver?.specialty ?? booking.caregiverSpecialty)
                                 .font(CLTheme.captionFont)
                                 .foregroundStyle(.white.opacity(0.8))
                             HStack(spacing: 4) {
                                 Image(systemName: "star.fill")
                                     .font(.system(size: 12))
                                     .foregroundStyle(CLTheme.starYellow)
-                                Text(String(format: "%.1f", caregiver.rating))
+                                Text(String(format: "%.1f", heroCaregiver?.rating ?? booking.caregiverRating))
                                     .font(CLTheme.calloutFont)
                                     .foregroundStyle(.white)
                                 Text("•")
                                     .foregroundStyle(.white.opacity(0.5))
-                                Text("$\(String(format: "%.0f", caregiver.hourlyRate))/hr")
+                                Text("$\(String(format: "%.0f", heroCaregiver?.hourlyRate ?? (booking.totalCost / max(booking.duration, 0.5))))/hr")
                                     .font(CLTheme.calloutFont)
                                     .foregroundStyle(.white.opacity(0.9))
                             }
@@ -198,10 +232,12 @@ struct HomeView: View {
 
                     HStack(spacing: CLTheme.spacingMD) {
                         Button {
-                            if let conn = heroConnection {
+                            if let caregiver = heroCaregiver, let conn = heroConnection {
                                 openChatWithCaregiver(caregiver, connection: conn)
-                            } else {
+                            } else if let caregiver = heroCaregiver {
                                 openChatWithCaregiverUnconnected(caregiver)
+                            } else {
+                                openChatForBookingFallback(booking)
                             }
                         } label: {
                             HStack(spacing: 6) {
@@ -219,13 +255,15 @@ struct HomeView: View {
                         .buttonStyle(.plain)
 
                         Button {
-                            selectedCaregiver = caregiver
-                            showCaregiverProfile = true
+                            if let caregiver = heroCaregiver {
+                                selectedCaregiver = caregiver
+                                showCaregiverProfile = true
+                            }
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "calendar.badge.plus")
                                     .font(.system(size: 14))
-                                Text(heroBooking != nil ? "Details" : "Book Session")
+                                Text("Details")
                                     .font(CLTheme.calloutFont)
                             }
                             .foregroundStyle(.white)
@@ -239,8 +277,21 @@ struct HomeView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                        .disabled(heroCaregiver == nil)
                     }
                     .padding(.top, CLTheme.spacingMD)
+
+                    if booking.status == .awaitingCaregiver || booking.status == .pending || booking.status == .confirmed {
+                        CLButton(
+                            title: isCancellingRequest ? "Cancelling..." : "Cancel Request",
+                            icon: "xmark.circle",
+                            style: .outline,
+                            isLoading: isCancellingRequest
+                        ) {
+                            showCancelRequestConfirmation = true
+                        }
+                        .padding(.top, CLTheme.spacingMD)
+                    }
                 }
                 .padding(CLTheme.spacingMD)
                 .background(
@@ -266,6 +317,224 @@ struct HomeView: View {
             statCard(icon: "bubble.left.fill", value: "\(appState.chatService.conversations.count)", label: "Chats", color: CLTheme.tealAccent)
         }
         .padding(.horizontal, CLTheme.spacingMD)
+    }
+
+    // MARK: - Assigned caregiver dashboard (Fitness-inspired)
+
+    @ViewBuilder
+    private var assignedCaregiverMonitoringSection: some View {
+        if let booking = heroBooking ?? activeBooking {
+            VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+                Text(activeBooking != nil ? "Live Care Session" : "Care Request In Progress")
+                    .font(CLTheme.title2Font)
+                    .foregroundStyle(CLTheme.textPrimary)
+                    .padding(.horizontal, CLTheme.spacingMD)
+
+                CLCard {
+                    VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+                        HStack(spacing: CLTheme.spacingMD) {
+                            CaregiverAvatar(
+                                size: 56,
+                                imageURL: heroCaregiver?.imageURL ?? booking.caregiverImageURL,
+                                showVerified: heroCaregiver?.isVerified ?? false
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(heroCaregiver?.name ?? booking.caregiverName)
+                                    .font(CLTheme.headlineFont)
+                                    .foregroundStyle(CLTheme.textPrimary)
+                                Text(heroCaregiver?.specialty ?? booking.caregiverSpecialty)
+                                    .font(CLTheme.captionFont)
+                                    .foregroundStyle(CLTheme.textSecondary)
+                            }
+                            Spacer()
+                            Text(activeBooking != nil ? "Assigned" : "Requested")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(activeBooking != nil ? CLTheme.successGreen : CLTheme.warningOrange)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background((activeBooking != nil ? CLTheme.successGreen : CLTheme.warningOrange).opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+
+                        HStack {
+                            Label(
+                                "\(booking.startTime.formatted(date: .omitted, time: .shortened)) - \(booking.endTime.formatted(date: .omitted, time: .shortened))",
+                                systemImage: "clock"
+                            )
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textSecondary)
+                            Spacer()
+                            Label(booking.status.rawValue, systemImage: "waveform.path.ecg")
+                                .font(CLTheme.captionFont)
+                                .foregroundStyle(CLTheme.accentBlue)
+                        }
+                    }
+                }
+                .padding(.horizontal, CLTheme.spacingMD)
+
+                if activeBooking != nil {
+                    TimelineView(.periodic(from: Date(), by: 1)) { context in
+                        let metrics = monitoringMetrics(now: context.date)
+                        VStack(spacing: CLTheme.spacingMD) {
+                            monitoringHeroCard(metrics: metrics)
+                            HStack(spacing: CLTheme.spacingMD) {
+                                monitoringTile(
+                                    title: "Heart Rate",
+                                    value: "\(metrics.heartRate)",
+                                    unit: "BPM",
+                                    icon: "heart.fill",
+                                    color: CLTheme.errorRed
+                                )
+                                monitoringTile(
+                                    title: "SpO2",
+                                    value: "\(metrics.oxygen)",
+                                    unit: "%",
+                                    icon: "lungs.fill",
+                                    color: CLTheme.tealAccent
+                                )
+                            }
+                            HStack(spacing: CLTheme.spacingMD) {
+                                monitoringTile(
+                                    title: "Progress",
+                                    value: "\(metrics.progress)",
+                                    unit: "%",
+                                    icon: "figure.walk",
+                                    color: CLTheme.accentBlue
+                                )
+                                monitoringTile(
+                                    title: "Stress",
+                                    value: metrics.stress,
+                                    unit: "Level",
+                                    icon: "waveform",
+                                    color: CLTheme.warningOrange
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, CLTheme.spacingMD)
+                } else {
+                    CLCard {
+                        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                            Text("Waiting for caregiver response")
+                                .font(CLTheme.headlineFont)
+                                .foregroundStyle(CLTheme.textPrimary)
+                            Text("Your request was sent successfully. You will see live monitoring here as soon as it is confirmed.")
+                                .font(CLTheme.calloutFont)
+                                .foregroundStyle(CLTheme.textSecondary)
+                            HStack(spacing: CLTheme.spacingSM) {
+                                Image(systemName: "clock.badge.checkmark")
+                                    .foregroundStyle(CLTheme.warningOrange)
+                                Text("Status updates in real-time")
+                                    .font(CLTheme.captionFont)
+                                    .foregroundStyle(CLTheme.textTertiary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, CLTheme.spacingMD)
+                }
+            }
+        }
+    }
+
+    private func monitoringHeroCard(metrics: MonitoringMetrics) -> some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Realtime Monitoring")
+                        .font(CLTheme.headlineFont)
+                        .foregroundStyle(.white)
+                    Text("Updated every second")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(.white.opacity(0.82))
+                }
+                Spacer()
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.white)
+            }
+
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.2), lineWidth: 9)
+                Circle()
+                    .trim(from: 0, to: CGFloat(metrics.progress) / 100)
+                    .stroke(.white, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                VStack(spacing: 2) {
+                    Text("\(metrics.progress)%")
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Session goal")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .frame(width: 120, height: 120)
+        }
+        .padding(CLTheme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [CLTheme.primaryNavy, CLTheme.accentBlue],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusXL))
+        .shadow(color: CLTheme.primaryNavy.opacity(0.24), radius: 12, y: 4)
+    }
+
+    private func monitoringTile(
+        title: String,
+        value: String,
+        unit: String,
+        icon: String,
+        color: Color
+    ) -> some View {
+        CLCard {
+            VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                HStack {
+                    Image(systemName: icon)
+                        .foregroundStyle(color)
+                    Spacer()
+                }
+                Text(title.uppercased())
+                    .font(CLTheme.smallFont)
+                    .tracking(1)
+                    .foregroundStyle(CLTheme.textTertiary)
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Text(unit)
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textSecondary)
+                }
+            }
+        }
+    }
+
+    private struct MonitoringMetrics {
+        var heartRate: Int
+        var oxygen: Int
+        var progress: Int
+        var stress: String
+    }
+
+    private func monitoringMetrics(now: Date) -> MonitoringMetrics {
+        let second = Calendar.current.component(.second, from: now)
+        let minute = Calendar.current.component(.minute, from: now)
+        let heartRate = 68 + Int((sin(Double(second) / 60 * .pi * 2) * 7).rounded())
+        let oxygen = 96 + (second % 3)
+        let progress = min(98, 40 + (minute % 50))
+        let stress: String = {
+            switch (second / 15) % 4 {
+            case 0: return "Low"
+            case 1, 2: return "Moderate"
+            default: return "Low"
+            }
+        }()
+        return MonitoringMetrics(heartRate: max(55, heartRate), oxygen: oxygen, progress: progress, stress: stress)
     }
 
     private func statCard(icon: String, value: String, label: String, color: Color) -> some View {
@@ -497,6 +766,25 @@ struct HomeView: View {
         return (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
     }
 
+    @MainActor
+    private func applyRealtimeBookingUpdate(_ bookings: [Booking]) {
+        let confirmedMatch = bookings.first { $0.status == .confirmed || $0.status == .inProgress }
+        let pendingMatch = bookings.first { $0.status == .awaitingCaregiver || $0.status == .pending }
+        if let active = confirmedMatch ?? pendingMatch {
+            setCurrentCareBooking(active, isActive: confirmedMatch != nil)
+            return
+        }
+
+        // No active/pending found in this snapshot. Prevent transient clear/flicker:
+        // if we already have a booking mode active, reconcile with a direct fetch first.
+        if activeBooking != nil || pendingBooking != nil {
+            reconcileBookingStateFromServer()
+            return
+        }
+
+        bookingCaregiver = nil
+    }
+
     private func loadActiveBookingCard(from list: [Booking]? = nil) async {
         let loaded: [Booking]
         if let list {
@@ -504,11 +792,23 @@ struct HomeView: View {
         } else {
             loaded = await loadBookingHistory()
         }
-        let match = loaded.first { $0.status == .confirmed || $0.status == .inProgress }
-        activeBooking = match
-        if let b = match {
-            bookingCaregiver = try? await appState.firestoreService.fetchCaregiver(id: b.caregiverId)
-        } else {
+        let confirmedMatch = loaded.first { $0.status == .confirmed || $0.status == .inProgress }
+        let pendingMatch = loaded.first { $0.status == .awaitingCaregiver || $0.status == .pending }
+        if let booking = confirmedMatch ?? pendingMatch {
+            await MainActor.run {
+                setCurrentCareBooking(booking, isActive: confirmedMatch != nil)
+            }
+            let caregiver = try? await appState.firestoreService.fetchCaregiver(id: booking.caregiverId)
+            await MainActor.run {
+                if let caregiver {
+                    bookingCaregiver = caregiver
+                }
+            }
+            return
+        }
+
+        // Avoid clearing existing UI from possibly stale initial fetch.
+        if activeBooking == nil && pendingBooking == nil {
             bookingCaregiver = nil
         }
     }
@@ -542,6 +842,98 @@ struct HomeView: View {
             )
             chatConversation = conv
             showChat = true
+        }
+    }
+
+    private func openChatForBookingFallback(_ booking: Booking) {
+        Task {
+            let userId = appState.authService.currentUser?.uid ?? ""
+            let userName = appState.authService.userProfile?.fullName ?? "User"
+            let conv = try? await appState.chatService.getOrCreateConversation(
+                userId: userId,
+                userName: userName,
+                caregiverId: booking.caregiverId,
+                caregiverName: booking.caregiverName,
+                caregiverSpecialty: booking.caregiverSpecialty
+            )
+            chatConversation = conv
+            showChat = true
+        }
+    }
+
+    private func cancelCurrentBookingRequest() {
+        guard let bookingId = (activeBooking ?? pendingBooking)?.id else { return }
+        isCancellingRequest = true
+        Task {
+            do {
+                try await appState.firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
+                if let booking = try? await appState.firestoreService.fetchBooking(bookingId: bookingId) {
+                    try? await appState.firestoreService.upsertConnectionForBooking(
+                        booking: booking,
+                        status: .rejected
+                    )
+                }
+            } catch {
+                // Reuse global error surfaces elsewhere; UI is kept simple here.
+            }
+            await MainActor.run {
+                isCancellingRequest = false
+            }
+        }
+    }
+
+    @MainActor
+    private func setCurrentCareBooking(_ booking: Booking, isActive: Bool) {
+        if isActive {
+            activeBooking = booking
+            pendingBooking = nil
+        } else {
+            pendingBooking = booking
+            activeBooking = nil
+        }
+        lastKnownCareBookingId = booking.id
+
+        Task {
+            let caregiver = try? await appState.firestoreService.fetchCaregiver(id: booking.caregiverId)
+            await MainActor.run {
+                if let caregiver {
+                    bookingCaregiver = caregiver
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func reconcileBookingStateFromServer() {
+        guard !isReconcilingBookingState else { return }
+        isReconcilingBookingState = true
+        Task {
+            let fresh = await loadBookingHistory()
+            await MainActor.run {
+                let confirmed = fresh.first { $0.status == .confirmed || $0.status == .inProgress }
+                let pending = fresh.first { $0.status == .awaitingCaregiver || $0.status == .pending }
+
+                if let booking = confirmed {
+                    setCurrentCareBooking(booking, isActive: true)
+                } else if let booking = pending {
+                    setCurrentCareBooking(booking, isActive: false)
+                } else {
+                    // Clear only if the known booking reached terminal state or truly disappeared.
+                    if let knownId = lastKnownCareBookingId,
+                       let terminal = fresh.first(where: { $0.id == knownId }),
+                       (terminal.status == .cancelled || terminal.status == .completed) {
+                        activeBooking = nil
+                        pendingBooking = nil
+                        bookingCaregiver = nil
+                        lastKnownCareBookingId = nil
+                    } else if lastKnownCareBookingId == nil {
+                        activeBooking = nil
+                        pendingBooking = nil
+                        bookingCaregiver = nil
+                    }
+                }
+                isReconcilingBookingState = false
+            }
         }
     }
 }

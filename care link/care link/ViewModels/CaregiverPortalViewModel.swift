@@ -57,6 +57,10 @@ final class CaregiverPortalViewModel {
             try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .confirmed)
             if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
                 appointments[index].status = .confirmed
+                try? await firestoreService.upsertConnectionForBooking(
+                    booking: appointments[index],
+                    status: .approved
+                )
             }
             categorizeAppointments()
             riskByBookingId.removeValue(forKey: bookingId)
@@ -69,6 +73,10 @@ final class CaregiverPortalViewModel {
         do {
             try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
             if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
+                try? await firestoreService.upsertConnectionForBooking(
+                    booking: appointments[index],
+                    status: .rejected
+                )
                 appointments[index].status = .cancelled
             }
             categorizeAppointments()
