@@ -11,13 +11,26 @@ final class BiometricService {
         checkAvailability()
     }
 
-    /// Uses `.deviceOwnerAuthentication` so Face ID / Touch ID **or the device passcode** is allowed.
-    /// This matches the iOS Settings screen and works on the **Simulator** (passcode, or Features → Face ID → Enrolled + Matching Face).
+    /// Uses device-owner auth so Face ID/Touch ID can fall back to device passcode when needed.
     func checkAvailability() {
         let context = LAContext()
         var error: NSError?
-        isAvailable = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
+        let canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
         biometricType = context.biometryType
+        // Keep availability true when hardware exists and is enrolled even if policy is temporarily unavailable.
+        // This avoids hiding Face ID UI after transient LAContext failures.
+        if canUseBiometrics {
+            isAvailable = true
+        } else if biometricType != .none, let laError = error.flatMap({ LAError(_nsError: $0) }) {
+            switch laError.code {
+            case .biometryLockout, .appCancel, .systemCancel, .invalidContext, .notInteractive:
+                isAvailable = true
+            default:
+                isAvailable = false
+            }
+        } else {
+            isAvailable = false
+        }
     }
 
     func authenticate() async -> Bool {
@@ -31,7 +44,22 @@ final class BiometricService {
                 localizedReason: "Unlock CareLink to protect your health information."
             )
         } catch {
-            errorMessage = error.localizedDescription
+            if let laError = error as? LAError {
+                switch laError.code {
+                case .biometryLockout:
+                    errorMessage = "Face ID is temporarily locked. Unlock your phone once, then try again."
+                case .biometryNotEnrolled:
+                    errorMessage = "Face ID is not set up on this device."
+                case .biometryNotAvailable:
+                    errorMessage = "Biometric authentication is not available right now."
+                case .userCancel, .systemCancel, .appCancel:
+                    errorMessage = nil
+                default:
+                    errorMessage = laError.localizedDescription
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
             return false
         }
     }
@@ -45,7 +73,7 @@ final class BiometricService {
         }
     }
 
-    /// Shorter label for buttons when only passcode is available (e.g. Simulator without Face ID enrolled).
+    /// Label for unlock buttons.
     var unlockButtonLabel: String {
         switch biometricType {
         case .faceID: return "Face ID"

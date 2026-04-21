@@ -367,25 +367,24 @@ private struct BookingRequestChatCard: View {
 
     private func respond(accept: Bool) {
         guard let bid = message.bookingId else { return }
+        let caregiverUid = appState.authService.currentUser?.uid ?? ""
         isWorking = true
         Task {
             do {
                 if accept {
-                    try await appState.firestoreService.updateBookingStatus(bookingId: bid, status: .confirmed)
-                    if let existingBooking = try? await appState.firestoreService.fetchBooking(bookingId: bid) {
-                        try? await appState.firestoreService.upsertConnectionForBooking(
-                            booking: existingBooking,
-                            status: .approved
-                        )
-                    }
+                    _ = try await appState.firestoreService.applyBookingTransition(
+                        bookingId: bid,
+                        to: .confirmed,
+                        actor: .caregiver,
+                        callerUid: caregiverUid
+                    )
                 } else {
-                    try await appState.firestoreService.updateBookingStatus(bookingId: bid, status: .cancelled)
-                    if let existingBooking = try? await appState.firestoreService.fetchBooking(bookingId: bid) {
-                        try? await appState.firestoreService.upsertConnectionForBooking(
-                            booking: existingBooking,
-                            status: .rejected
-                        )
-                    }
+                    _ = try await appState.firestoreService.applyBookingTransition(
+                        bookingId: bid,
+                        to: .cancelled,
+                        actor: .caregiver,
+                        callerUid: caregiverUid
+                    )
                 }
                 booking = try? await appState.firestoreService.fetchBooking(bookingId: bid)
                 let note = accept ? "✅ Booking accepted." : "Booking declined."

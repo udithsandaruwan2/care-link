@@ -9,6 +9,10 @@ struct BookingDetailsView: View {
     @State private var showConfirmation = false
     @State private var bookingHistory: [Booking] = []
 
+    private var hasBlockingBooking: Bool {
+        bookingHistory.contains(where: { $0.status.blocksNewBookingRequest })
+    }
+
     private let popularDurations = ["Morning (4h)", "Afternoon (3h)", "Full Day (8h)"]
 
     var body: some View {
@@ -341,6 +345,14 @@ struct BookingDetailsView: View {
                         showConfirmation = true
                     }
                 }
+            }
+            .disabled(hasBlockingBooking || viewModel.isLoading)
+
+            if let existing = bookingHistory.first(where: { $0.status.blocksNewBookingRequest }) {
+                Text("Active request with \(existing.caregiverName) (\(existing.status.rawValue)). Complete or cancel it before booking another caregiver.")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.warningOrange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.horizontal, CLTheme.spacingLG)

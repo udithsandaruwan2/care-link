@@ -27,7 +27,7 @@ struct MainTabView: View {
                 switch selectedTab {
                 case .home:
                     if appState.currentUserRole == .caregiver {
-                        CaregiverDashboardView()
+                        CaregiverHomeView(suppressMainTabBar: $homeStackHidesTabBar)
                     } else {
                         HomeView(suppressMainTabBar: $homeStackHidesTabBar)
                     }

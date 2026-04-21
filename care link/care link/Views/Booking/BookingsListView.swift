@@ -121,19 +121,24 @@ struct BookingsListView: View {
                         .foregroundStyle(CLTheme.accentBlue)
                 }
 
-                if booking.status == .pending {
+                if BookingStateMachine.patientMayRequestCancel(status: booking.status) {
+                    let patientUid = appState.authService.currentUser?.uid ?? ""
                     Button {
                         Task {
-                            try? await appState.firestoreService.updateBookingStatus(
-                                bookingId: booking.id,
-                                status: .cancelled
-                            )
-                            if let index = bookings.firstIndex(where: { $0.id == booking.id }) {
-                                bookings[index].status = .cancelled
-                            }
+                            do {
+                                let updated = try await appState.firestoreService.applyBookingTransition(
+                                    bookingId: booking.id,
+                                    to: .cancelled,
+                                    actor: .patient,
+                                    callerUid: patientUid
+                                )
+                                if let index = bookings.firstIndex(where: { $0.id == booking.id }) {
+                                    bookings[index] = updated
+                                }
+                            } catch {}
                         }
                     } label: {
-                        Text("Cancel Booking")
+                        Text("Cancel request")
                             .font(CLTheme.calloutFont)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)

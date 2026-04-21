@@ -43,6 +43,11 @@ struct Booking: Identifiable, Codable, Sendable {
         var needsCaregiverAction: Bool {
             self == .awaitingCaregiver || self == .pending
         }
+
+        /// While in these states, patient should not create another booking request.
+        var blocksNewBookingRequest: Bool {
+            self == .awaitingCaregiver || self == .pending || self == .confirmed || self == .inProgress
+        }
     }
 
     enum PaymentMethod: String, Codable, Sendable, CaseIterable {

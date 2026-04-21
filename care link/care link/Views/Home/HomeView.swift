@@ -128,7 +128,7 @@ struct HomeView: View {
     }
 
     private var hasAssignedCaregiverDashboard: Bool {
-        heroBooking != nil || heroCaregiver != nil || pendingBooking != nil
+        lastKnownCareBookingId != nil || heroBooking != nil || pendingBooking != nil
     }
 
     private func syncMainTabBarVisibility() {
@@ -138,7 +138,7 @@ struct HomeView: View {
     // MARK: - Greeting
 
     private var greetingSection: some View {
-        VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
+        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
             let hour = Calendar.current.component(.hour, from: Date())
             let greeting = hour < 12 ? "Good Morning" : (hour < 17 ? "Good Afternoon" : "Good Evening")
 
@@ -148,6 +148,7 @@ struct HomeView: View {
             Text(appState.authService.userProfile?.fullName ?? "User")
                 .font(CLTheme.largeTitleFont)
                 .foregroundStyle(CLTheme.textPrimary)
+
         }
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.top, CLTheme.spacingSM)
@@ -775,14 +776,28 @@ struct HomeView: View {
             return
         }
 
-        // No active/pending found in this snapshot. Prevent transient clear/flicker:
-        // if we already have a booking mode active, reconcile with a direct fetch first.
-        if activeBooking != nil || pendingBooking != nil {
-            reconcileBookingStateFromServer()
+        // Keep current care-flow UI sticky unless server explicitly reports terminal state
+        // for the known booking.
+        guard let knownId = lastKnownCareBookingId else {
+            bookingCaregiver = nil
+            activeBooking = nil
+            pendingBooking = nil
             return
         }
 
-        bookingCaregiver = nil
+        if let terminal = bookings.first(where: { $0.id == knownId }),
+           terminal.status == .cancelled || terminal.status == .completed {
+            activeBooking = nil
+            pendingBooking = nil
+            bookingCaregiver = nil
+            lastKnownCareBookingId = nil
+            return
+        }
+
+        // No explicit terminal signal for the known booking; keep current state.
+        if activeBooking == nil && pendingBooking == nil {
+            reconcileBookingStateFromServer()
+        }
     }
 
     private func loadActiveBookingCard(from list: [Booking]? = nil) async {
@@ -808,7 +823,7 @@ struct HomeView: View {
         }
 
         // Avoid clearing existing UI from possibly stale initial fetch.
-        if activeBooking == nil && pendingBooking == nil {
+        if activeBooking == nil && pendingBooking == nil && lastKnownCareBookingId == nil {
             bookingCaregiver = nil
         }
     }
@@ -863,16 +878,16 @@ struct HomeView: View {
 
     private func cancelCurrentBookingRequest() {
         guard let bookingId = (activeBooking ?? pendingBooking)?.id else { return }
+        let patientUid = appState.authService.currentUser?.uid ?? ""
         isCancellingRequest = true
         Task {
             do {
-                try await appState.firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
-                if let booking = try? await appState.firestoreService.fetchBooking(bookingId: bookingId) {
-                    try? await appState.firestoreService.upsertConnectionForBooking(
-                        booking: booking,
-                        status: .rejected
-                    )
-                }
+                _ = try await appState.firestoreService.applyBookingTransition(
+                    bookingId: bookingId,
+                    to: .cancelled,
+                    actor: .patient,
+                    callerUid: patientUid
+                )
             } catch {
                 // Reuse global error surfaces elsewhere; UI is kept simple here.
             }

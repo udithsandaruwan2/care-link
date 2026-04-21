@@ -1,9 +1,11 @@
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
-    @State private var notificationsEnabled = true
+    @AppStorage("carelink.darkModeEnabled") private var darkModeEnabled = false
+    @AppStorage("carelink.pushNotificationsEnabled") private var pushNotificationsEnabled = false
     @State private var biometricEnabled = false
     @State private var isSyncingBiometricToggle = false
     @State private var didInitializeBiometricToggle = false
@@ -13,13 +15,17 @@ struct SettingsView: View {
     @State private var showDeleteConfirmation = false
     @State private var showSignOutConfirmation = false
     @State private var showClearDataConfirmation = false
+    @State private var showSupportCenter = false
+    @State private var showPrivacyPolicy = false
+
+    private let supportEmail = "support@carelink.app"
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     settingsRow(icon: "bell.fill", title: "Push Notifications", color: CLTheme.accentBlue) {
-                        Toggle("", isOn: $notificationsEnabled)
+                        Toggle("", isOn: $pushNotificationsEnabled)
                             .tint(CLTheme.accentBlue)
                     }
 
@@ -31,7 +37,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Security & Privacy")
                 } footer: {
-                    Text("After you sign in once and tap Enable, CareLink can unlock with Face ID, Touch ID, or your passcode each time you open the app (Simulator: set a device passcode or use Features → Face ID). Turn off to remove saved sign-in.")
+                    Text("Push notifications use Apple’s permission dialog the first time you turn them on. You can revoke access anytime in the iOS Settings app. After you sign in once and tap Enable for biometric login, CareLink can unlock with Face ID or Touch ID each time you open the app. Turn off biometric to remove saved sign-in.")
                 }
 
                 Section {
@@ -42,19 +48,26 @@ struct SettingsView: View {
                     }
 
                     settingsRow(icon: "moon.fill", title: "Dark Mode", color: CLTheme.primaryNavy) {
-                        Toggle("", isOn: .constant(false))
+                        Toggle("", isOn: $darkModeEnabled)
                             .tint(CLTheme.primaryNavy)
                     }
                 } header: {
                     Text("Accessibility")
+                } footer: {
+                    Text("Dark appearance is stored on this device only.")
                 }
 
                 Section {
-                    settingsRow(icon: "questionmark.circle.fill", title: "Help & Support", color: CLTheme.accentBlue) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                            .foregroundStyle(CLTheme.textTertiary)
+                    Button {
+                        showSupportCenter = true
+                    } label: {
+                        settingsRow(icon: "questionmark.circle.fill", title: "Help & Support", color: CLTheme.accentBlue) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(CLTheme.textTertiary)
+                        }
                     }
+                    .buttonStyle(.plain)
 
                     settingsRow(icon: "doc.text.fill", title: "Terms of Service", color: CLTheme.textSecondary) {
                         Image(systemName: "chevron.right")
@@ -62,13 +75,20 @@ struct SettingsView: View {
                             .foregroundStyle(CLTheme.textTertiary)
                     }
 
-                    settingsRow(icon: "lock.shield.fill", title: "Privacy Policy", color: CLTheme.textSecondary) {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12))
-                            .foregroundStyle(CLTheme.textTertiary)
+                    Button {
+                        showPrivacyPolicy = true
+                    } label: {
+                        settingsRow(icon: "lock.shield.fill", title: "Privacy Policy", color: CLTheme.textSecondary) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(CLTheme.textTertiary)
+                        }
                     }
+                    .buttonStyle(.plain)
                 } header: {
                     Text("About")
+                } footer: {
+                    Text("Need help? Email \(supportEmail).")
                 }
 
                 Section {
@@ -142,6 +162,12 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: $showSupportCenter) {
+                SupportCenterView()
+            }
+            .navigationDestination(isPresented: $showPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
@@ -184,11 +210,32 @@ struct SettingsView: View {
                 Text(biometricInfoMessage)
             }
             .onAppear {
+                Task {
+                    let settings = await UNUserNotificationCenter.current().notificationSettings()
+                    await MainActor.run {
+                        appState.notificationService.isAuthorized = (settings.authorizationStatus == .authorized)
+                    }
+                }
                 appState.biometricService.checkAvailability()
                 let localEnabled = UserDefaults.standard.bool(forKey: AppState.biometricAppUnlockPreferenceKey)
                 let profileEnabled = appState.authService.userProfile?.isBiometricEnabled == true
                 setBiometricToggle(localEnabled && profileEnabled)
                 didInitializeBiometricToggle = true
+            }
+            .onChange(of: pushNotificationsEnabled) { _, enabled in
+                Task { @MainActor in
+                    if enabled {
+                        await appState.notificationService.requestAuthorization()
+                        let settings = await UNUserNotificationCenter.current().notificationSettings()
+                        let ok = settings.authorizationStatus == .authorized
+                        appState.notificationService.isAuthorized = ok
+                        if !ok {
+                            pushNotificationsEnabled = false
+                        }
+                    } else {
+                        appState.notificationService.isAuthorized = false
+                    }
+                }
             }
             .onChange(of: biometricEnabled) { _, newValue in
                 guard didInitializeBiometricToggle, !isSyncingBiometricToggle else { return }

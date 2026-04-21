@@ -8,6 +8,7 @@ struct CaregiverProfileView: View {
     @State private var reviews: [Review] = []
     @State private var showBooking = false
     @State private var existingConnection: Connection?
+    @State private var activePatientBooking: Booking?
     @State private var isRequestingConnection = false
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
@@ -71,7 +72,11 @@ struct CaregiverProfileView: View {
                 userId: userId, caregiverId: caregiver.id
             )
         }()
-        _ = await (reviewsTask, connectionTask)
+        async let bookingTask: () = {
+            let bookings = (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
+            self.activePatientBooking = bookings.first { $0.status.blocksNewBookingRequest }
+        }()
+        _ = await (reviewsTask, connectionTask, bookingTask)
     }
 
     // MARK: - Connection Status Banner
@@ -311,6 +316,17 @@ struct CaregiverProfileView: View {
                         .padding(.vertical, 14)
                         .background(CLTheme.gradientBlue)
                         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+                    }
+                    .disabled(activePatientBooking != nil)
+                }
+
+                if let active = activePatientBooking {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.fill")
+                            .foregroundStyle(CLTheme.warningOrange)
+                        Text("You already have an active request with \(active.caregiverName). Cancel or complete it before creating a new booking.")
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textSecondary)
                     }
                 }
 

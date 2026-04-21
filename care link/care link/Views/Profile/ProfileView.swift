@@ -8,6 +8,9 @@ struct ProfileView: View {
     @State private var showMedicalRecords = false
     @State private var showFamilyMembers = false
     @State private var showPaymentMethods = false
+    @State private var showMyCareHub = false
+    @State private var showSupportCenter = false
+    @State private var showPrivacyPolicy = false
     @State private var bookings: [Booking] = []
     @State private var connections: [Connection] = []
 
@@ -52,11 +55,21 @@ struct ProfileView: View {
                 PaymentMethodsView()
                     .environment(appState)
             }
+            .navigationDestination(isPresented: $showMyCareHub) {
+                MyCareHubView()
+                    .environment(appState)
+            }
             .navigationDestination(isPresented: $showMedicalRecords) {
                 let userId = appState.authService.currentUser?.uid ?? ""
                 let userName = appState.authService.userProfile?.fullName ?? "Patient"
                 MedicalRecordsView(patientId: userId, patientName: userName)
                     .environment(appState)
+            }
+            .navigationDestination(isPresented: $showSupportCenter) {
+                SupportCenterView()
+            }
+            .navigationDestination(isPresented: $showPrivacyPolicy) {
+                PrivacyPolicyView()
             }
             .task {
                 let userId = appState.authService.currentUser?.uid ?? ""
@@ -164,6 +177,11 @@ struct ProfileView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
             VStack(spacing: CLTheme.spacingSM) {
+                if appState.currentUserRole == .user {
+                    profileMenuRow(icon: "heart.text.square", title: "My care hub", subtitle: "Active requests, visits, and history") {
+                        showMyCareHub = true
+                    }
+                }
                 profileMenuRow(icon: "person", title: "Edit Profile", subtitle: "Update your personal details") {
                     showEditProfile = true
                 }
@@ -189,8 +207,12 @@ struct ProfileView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
             VStack(spacing: CLTheme.spacingSM) {
-                profileMenuRow(icon: "questionmark.circle", title: "Help & Support", subtitle: "FAQs and contact support") {}
-                profileMenuRow(icon: "lock.shield", title: "Privacy Policy", subtitle: "Terms and data usage") {}
+                profileMenuRow(icon: "questionmark.circle", title: "Help & Support", subtitle: "Contact support and browse Q&A") {
+                    showSupportCenter = true
+                }
+                profileMenuRow(icon: "lock.shield", title: "Privacy Policy", subtitle: "Terms and data usage") {
+                    showPrivacyPolicy = true
+                }
             }
             .padding(.horizontal, CLTheme.spacingMD)
         }

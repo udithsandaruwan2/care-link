@@ -66,7 +66,7 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Saved account + Face ID / Touch ID / passcode sign-in
+    // MARK: - Saved account + biometric sign-in
 
     @ViewBuilder
     private var biometricQuickSignInSection: some View {
@@ -90,7 +90,7 @@ struct LoginView: View {
                                         .foregroundStyle(CLTheme.textSecondary)
                                         .lineLimit(1)
                                 } else {
-                                    Text("Sign in with Face ID, Touch ID, or passcode")
+                                    Text("Sign in with Face ID or Touch ID")
                                         .font(CLTheme.captionFont)
                                         .foregroundStyle(CLTheme.textTertiary)
                                 }

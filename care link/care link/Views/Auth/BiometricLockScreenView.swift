@@ -21,7 +21,7 @@ struct BiometricLockScreenView: View {
                         .font(CLTheme.titleFont)
                         .foregroundStyle(.white)
 
-                    Text("Face matching starts automatically. If Face ID is unavailable, use Touch ID or your device passcode.")
+                    Text("Face matching starts automatically. If biometrics are unavailable, sign out and log in manually.")
                         .font(CLTheme.bodyFont)
                         .foregroundStyle(.white.opacity(0.85))
                         .multilineTextAlignment(.center)

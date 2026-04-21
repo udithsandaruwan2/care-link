@@ -46,11 +46,21 @@ struct PaymentMethodsView: View {
     }
 
     private var titleBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Manage your digital wallet and billing securely.")
+        VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+            Text("Demo wallet")
+                .font(CLTheme.headlineFont)
+                .foregroundStyle(CLTheme.primaryNavy)
+            Text("Cards and balances stay on this device for development and demos. There is no live Stripe processing in this build.")
+                .font(CLTheme.captionFont)
+                .foregroundStyle(CLTheme.textSecondary)
+            Text("Manage your saved payment methods below.")
                 .font(CLTheme.bodyFont)
                 .foregroundStyle(CLTheme.textSecondary)
         }
+        .padding(CLTheme.spacingMD)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(CLTheme.lightBlue.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD, style: .continuous))
     }
 
     private func cardView(_ card: PaymentCard) -> some View {

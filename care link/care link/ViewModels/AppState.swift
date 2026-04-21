@@ -4,7 +4,7 @@ import FirebaseAuth
 
 @Observable
 final class AppState {
-    /// When true (after user opts in), reopening the app with a Firebase session requires unlock via Face ID / Touch ID / passcode.
+    /// When true (after user opts in), reopening the app with a Firebase session requires biometric unlock.
     static let biometricAppUnlockPreferenceKey = "carelink.biometricAppUnlockEnabled"
 
     var isOnboardingComplete: Bool = UserDefaults.standard.bool(forKey: "isOnboardingComplete") {
@@ -108,6 +108,18 @@ final class AppState {
         }
         let ok = await biometricService.authenticate()
         if ok {
+            isBiometricAppLocked = false
+            return
+        }
+
+        // Avoid trapping the user behind the health-data lock if biometrics are unavailable.
+        if let message = biometricService.errorMessage,
+           message.contains("not available") || message.contains("not set up") {
+            UserDefaults.standard.removeObject(forKey: Self.biometricAppUnlockPreferenceKey)
+            if var profile = authService.userProfile {
+                profile.isBiometricEnabled = false
+                try? await firestoreService.updateUser(profile)
+            }
             isBiometricAppLocked = false
         }
     }

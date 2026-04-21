@@ -52,15 +52,16 @@ final class CaregiverPortalViewModel {
         riskByBookingId = map
     }
 
-    func acceptBooking(bookingId: String, firestoreService: FirestoreService) async {
+    func acceptBooking(bookingId: String, caregiverUid: String, firestoreService: FirestoreService) async {
         do {
-            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .confirmed)
+            let updated = try await firestoreService.applyBookingTransition(
+                bookingId: bookingId,
+                to: .confirmed,
+                actor: .caregiver,
+                callerUid: caregiverUid
+            )
             if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
-                appointments[index].status = .confirmed
-                try? await firestoreService.upsertConnectionForBooking(
-                    booking: appointments[index],
-                    status: .approved
-                )
+                appointments[index] = updated
             }
             categorizeAppointments()
             riskByBookingId.removeValue(forKey: bookingId)
@@ -69,15 +70,16 @@ final class CaregiverPortalViewModel {
         }
     }
 
-    func rejectBooking(bookingId: String, firestoreService: FirestoreService) async {
+    func rejectBooking(bookingId: String, caregiverUid: String, firestoreService: FirestoreService) async {
         do {
-            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
+            let updated = try await firestoreService.applyBookingTransition(
+                bookingId: bookingId,
+                to: .cancelled,
+                actor: .caregiver,
+                callerUid: caregiverUid
+            )
             if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
-                try? await firestoreService.upsertConnectionForBooking(
-                    booking: appointments[index],
-                    status: .rejected
-                )
-                appointments[index].status = .cancelled
+                appointments[index] = updated
             }
             categorizeAppointments()
             riskByBookingId.removeValue(forKey: bookingId)
@@ -86,11 +88,33 @@ final class CaregiverPortalViewModel {
         }
     }
 
-    func completeBooking(bookingId: String, firestoreService: FirestoreService) async {
+    func startBookingVisit(bookingId: String, caregiverUid: String, firestoreService: FirestoreService) async {
         do {
-            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .completed)
+            let updated = try await firestoreService.applyBookingTransition(
+                bookingId: bookingId,
+                to: .inProgress,
+                actor: .caregiver,
+                callerUid: caregiverUid
+            )
             if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
-                appointments[index].status = .completed
+                appointments[index] = updated
+            }
+            categorizeAppointments()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func completeBooking(bookingId: String, caregiverUid: String, firestoreService: FirestoreService) async {
+        do {
+            let updated = try await firestoreService.applyBookingTransition(
+                bookingId: bookingId,
+                to: .completed,
+                actor: .caregiver,
+                callerUid: caregiverUid
+            )
+            if let index = appointments.firstIndex(where: { $0.id == bookingId }) {
+                appointments[index] = updated
             }
             categorizeAppointments()
         } catch {

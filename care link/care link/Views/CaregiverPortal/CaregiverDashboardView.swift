@@ -15,6 +15,7 @@ struct CaregiverDashboardView: View {
     @State private var chatConversation: ChatConversation?
     @State private var showEditProfile = false
     @State private var featuredBooking: Booking?
+    @State private var featuredPatientProfile: CLUser?
 
     var body: some View {
         NavigationStack {
@@ -27,7 +28,7 @@ struct CaregiverDashboardView: View {
                         overviewCards
 
                         if let fb = featuredBooking {
-                            activePatientHeroCard(fb)
+                            activePatientHeroCard(fb, patient: featuredPatientProfile)
                         }
 
                         if !pendingConnections.isEmpty {
@@ -87,7 +88,7 @@ struct CaregiverDashboardView: View {
 
     // MARK: - Active patient (confirmed booking)
 
-    private func activePatientHeroCard(_ booking: Booking) -> some View {
+    private func activePatientHeroCard(_ booking: Booking, patient: CLUser?) -> some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
             Text("Your patient")
                 .font(CLTheme.title2Font)
@@ -127,33 +128,63 @@ struct CaregiverDashboardView: View {
                     }
                 }
 
-                HStack(spacing: CLTheme.spacingMD) {
-                    Button {
-                        openChatForBookingPatient(booking)
-                    } label: {
-                        Label("Message", systemImage: "message.fill")
-                            .font(CLTheme.calloutFont)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .foregroundStyle(.white)
-                            .background(CLTheme.primaryNavy)
-                            .clipShape(Capsule())
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: CLTheme.spacingMD) {
+                        Button {
+                            openChatForBookingPatient(booking)
+                        } label: {
+                            Label("Message", systemImage: "message.fill")
+                                .font(CLTheme.calloutFont)
+                                .frame(minWidth: 100)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(.white)
+                                .background(CLTheme.primaryNavy)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        if let phone = patient?.phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+                           !phone.isEmpty,
+                           let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: ""))") {
+                            Link(destination: url) {
+                                Label("Call", systemImage: "phone.fill")
+                                    .font(CLTheme.calloutFont)
+                                    .frame(minWidth: 88)
+                                    .padding(.vertical, 12)
+                                    .foregroundStyle(CLTheme.primaryNavy)
+                                    .background(CLTheme.lightBlue)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Button {
+                            selectedPatientId = booking.userId
+                            selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+                            showMedicalRecords = true
+                        } label: {
+                            Label("Records", systemImage: "doc.text.fill")
+                                .font(CLTheme.calloutFont)
+                                .frame(minWidth: 100)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(CLTheme.primaryNavy)
+                                .background(CLTheme.lightBlue)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            selectedPatientId = booking.userId
+                            selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+                            showMedicalRecords = true
+                        } label: {
+                            Label("Add record", systemImage: "plus.circle.fill")
+                                .font(CLTheme.calloutFont)
+                                .frame(minWidth: 120)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(.white)
+                                .background(CLTheme.accentBlue)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    Button {
-                        selectedPatientId = booking.userId
-                        selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
-                        showMedicalRecords = true
-                    } label: {
-                        Label("Records", systemImage: "doc.text.fill")
-                            .font(CLTheme.calloutFont)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .foregroundStyle(CLTheme.primaryNavy)
-                            .background(CLTheme.lightBlue)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(CLTheme.spacingMD)
@@ -506,9 +537,10 @@ struct CaregiverDashboardView: View {
                 }
 
                 if booking.status.needsCaregiverAction {
+                    let caregiverUid = appState.authService.currentUser?.uid ?? ""
                     HStack(spacing: CLTheme.spacingMD) {
                         Button {
-                            Task { await viewModel.rejectBooking(bookingId: booking.id, firestoreService: appState.firestoreService) }
+                            Task { await viewModel.rejectBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
                         } label: {
                             Text("Decline")
                                 .font(CLTheme.calloutFont)
@@ -520,7 +552,7 @@ struct CaregiverDashboardView: View {
                         }
                         .buttonStyle(.plain)
                         Button {
-                            Task { await viewModel.acceptBooking(bookingId: booking.id, firestoreService: appState.firestoreService) }
+                            Task { await viewModel.acceptBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
                         } label: {
                             Text("Accept")
                                 .font(CLTheme.calloutFont)
@@ -528,6 +560,51 @@ struct CaregiverDashboardView: View {
                                 .padding(.vertical, 12)
                                 .foregroundStyle(.white)
                                 .background(CLTheme.successGreen)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if booking.status == .confirmed || booking.status == .inProgress {
+                    let caregiverUid = appState.authService.currentUser?.uid ?? ""
+                    if booking.status == .confirmed {
+                        HStack(spacing: CLTheme.spacingMD) {
+                            Button {
+                                Task { await viewModel.startBookingVisit(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
+                            } label: {
+                                Text("Start visit")
+                                    .font(CLTheme.calloutFont)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .foregroundStyle(CLTheme.primaryNavy)
+                                    .background(CLTheme.lightBlue)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                Task { await viewModel.completeBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
+                            } label: {
+                                Text("Mark complete")
+                                    .font(CLTheme.calloutFont)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .foregroundStyle(.white)
+                                    .background(CLTheme.tealAccent)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if booking.status == .inProgress {
+                        Button {
+                            Task { await viewModel.completeBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
+                        } label: {
+                            Text("Mark complete")
+                                .font(CLTheme.calloutFont)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(.white)
+                                .background(CLTheme.tealAccent)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -567,6 +644,11 @@ struct CaregiverDashboardView: View {
         }()
         _ = await (appointmentsTask, patientsTask, pendingTask)
         featuredBooking = viewModel.upcomingAppointments.min(by: { $0.date == $1.date ? $0.startTime < $1.startTime : $0.date < $1.date })
+        if let fb = featuredBooking {
+            featuredPatientProfile = try? await appState.firestoreService.fetchUser(fb.userId)
+        } else {
+            featuredPatientProfile = nil
+        }
     }
 
     private func riskColor(_ level: BookingRiskAssessment.Level) -> Color {

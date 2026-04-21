@@ -67,10 +67,18 @@ final class ChatService {
             .collection("messages")
             .order(by: "sentAt", descending: false)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self, let snapshot else { return }
-                self.currentMessages = snapshot.documents.compactMap { doc in
-                    try? doc.data(as: ChatMessage.self)
+                guard let self else { return }
+                guard let snapshot else { return }
+                var decoded: [ChatMessage] = []
+                decoded.reserveCapacity(snapshot.documents.count)
+                for doc in snapshot.documents {
+                    do {
+                        decoded.append(try doc.data(as: ChatMessage.self))
+                    } catch {
+                        print("ChatService: skipped unreadable message \(doc.documentID): \(error)")
+                    }
                 }
+                self.currentMessages = decoded
             }
     }
 
@@ -102,17 +110,20 @@ final class ChatService {
         )
 
         let data = try Firestore.Encoder().encode(message)
-        try await db.collection("conversations")
+        let msgRef = db.collection("conversations")
             .document(conversationId)
             .collection("messages")
             .document(messageId)
-            .setData(data)
-
-        try await updateConversationAfterSend(
-            conversationId: conversationId,
-            senderId: senderId,
-            lastMessage: text
-        )
+        let conversation = try await fetchConversation(conversationId: conversationId)
+        let unreadField = senderId == conversation.userId ? "unreadCountCaregiver" : "unreadCountUser"
+        let batch = db.batch()
+        batch.setData(data, forDocument: msgRef)
+        batch.updateData([
+            "lastMessage": text,
+            "lastMessageAt": Timestamp(date: Date()),
+            unreadField: FieldValue.increment(Int64(1))
+        ], forDocument: db.collection("conversations").document(conversationId))
+        try await batch.commit()
     }
 
     /// Sends a structured booking request bubble (caregiver can accept/decline from chat).
@@ -137,17 +148,20 @@ final class ChatService {
         )
 
         let data = try Firestore.Encoder().encode(message)
-        try await db.collection("conversations")
+        let msgRef = db.collection("conversations")
             .document(conversationId)
             .collection("messages")
             .document(messageId)
-            .setData(data)
-
-        try await updateConversationAfterSend(
-            conversationId: conversationId,
-            senderId: senderId,
-            lastMessage: preview
-        )
+        let conversation = try await fetchConversation(conversationId: conversationId)
+        let unreadField = senderId == conversation.userId ? "unreadCountCaregiver" : "unreadCountUser"
+        let batch = db.batch()
+        batch.setData(data, forDocument: msgRef)
+        batch.updateData([
+            "lastMessage": preview,
+            "lastMessageAt": Timestamp(date: Date()),
+            unreadField: FieldValue.increment(Int64(1))
+        ], forDocument: db.collection("conversations").document(conversationId))
+        try await batch.commit()
     }
 
     // MARK: - Create Conversation
@@ -192,23 +206,24 @@ final class ChatService {
     // MARK: - Mark as Read
 
     func markMessagesAsRead(conversationId: String, readerId: String) async {
-        let snapshot = try? await db.collection("conversations")
-            .document(conversationId)
-            .collection("messages")
+        let convRef = db.collection("conversations").document(conversationId)
+        guard let snapshot = try? await convRef.collection("messages")
             .whereField("isRead", isEqualTo: false)
             .getDocuments()
+        else { return }
 
-        guard let documents = snapshot?.documents else { return }
-        for doc in documents {
+        guard let conversation = try? await fetchConversation(conversationId: conversationId) else { return }
+        let unreadField = readerId == conversation.userId ? "unreadCountUser" : "unreadCountCaregiver"
+
+        let batch = db.batch()
+        for doc in snapshot.documents {
             let senderId = doc.data()["senderId"] as? String ?? ""
             if senderId != readerId {
-                try? await doc.reference.updateData(["isRead": true])
+                batch.updateData(["isRead": true], forDocument: doc.reference)
             }
         }
-        if let conversation = try? await fetchConversation(conversationId: conversationId) {
-            let unreadField = readerId == conversation.userId ? "unreadCountUser" : "unreadCountCaregiver"
-            try? await db.collection("conversations").document(conversationId).updateData([unreadField: 0])
-        }
+        batch.updateData([unreadField: 0], forDocument: convRef)
+        try? await batch.commit()
     }
 
     func unreadCount(for userId: String, role: CLUser.UserRole) -> Int {
@@ -227,17 +242,4 @@ final class ChatService {
         return conversation
     }
 
-    private func updateConversationAfterSend(
-        conversationId: String,
-        senderId: String,
-        lastMessage: String
-    ) async throws {
-        let conversation = try await fetchConversation(conversationId: conversationId)
-        let unreadField = senderId == conversation.userId ? "unreadCountCaregiver" : "unreadCountUser"
-        try await db.collection("conversations").document(conversationId).updateData([
-            "lastMessage": lastMessage,
-            "lastMessageAt": Timestamp(date: Date()),
-            unreadField: FieldValue.increment(Int64(1))
-        ])
-    }
 }

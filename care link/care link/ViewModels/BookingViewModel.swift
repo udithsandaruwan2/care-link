@@ -102,6 +102,13 @@ final class BookingViewModel {
         isLoading = true
         defer { isLoading = false }
 
+        if let existing = try? await firestoreService.fetchBookings(for: userId).first(where: { $0.status.blocksNewBookingRequest }) {
+            let caregiverName = existing.caregiverName
+            errorMessage = "You already have an active care request with \(caregiverName). Please complete or cancel it before booking another caregiver."
+            showError = true
+            return false
+        }
+
         let booking = draftBooking(
             caregiver: caregiver,
             userId: userId,
@@ -146,11 +153,16 @@ final class BookingViewModel {
         }
     }
 
-    func cancelBooking(bookingId: String, firestoreService: FirestoreService) async {
+    func cancelBooking(bookingId: String, patientUid: String, firestoreService: FirestoreService) async {
         do {
-            try await firestoreService.updateBookingStatus(bookingId: bookingId, status: .cancelled)
+            let updated = try await firestoreService.applyBookingTransition(
+                bookingId: bookingId,
+                to: .cancelled,
+                actor: .patient,
+                callerUid: patientUid
+            )
             if let index = userBookings.firstIndex(where: { $0.id == bookingId }) {
-                userBookings[index].status = .cancelled
+                userBookings[index] = updated
             }
         } catch {
             errorMessage = error.localizedDescription

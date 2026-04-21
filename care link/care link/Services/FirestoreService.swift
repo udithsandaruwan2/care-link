@@ -146,6 +146,37 @@ final class FirestoreService {
         ])
     }
 
+    /// Validates domain rules, updates status, and keeps `connections` aligned with booking outcomes.
+    func applyBookingTransition(
+        bookingId: String,
+        to newStatus: Booking.BookingStatus,
+        actor: BookingStateMachine.Actor,
+        callerUid: String
+    ) async throws -> Booking {
+        guard let booking = try await fetchBooking(bookingId: bookingId) else {
+            throw BookingStateMachine.TransitionError.bookingNotFound
+        }
+        guard BookingStateMachine.callerMatches(actor: actor, booking: booking, callerUid: callerUid) else {
+            throw BookingStateMachine.TransitionError.forbidden
+        }
+        guard BookingStateMachine.canTransition(from: booking.status, to: newStatus, actor: actor) else {
+            throw BookingStateMachine.TransitionError.invalidTransition(from: booking.status, to: newStatus, actor: actor)
+        }
+
+        try await updateBookingStatus(bookingId: bookingId, status: newStatus)
+
+        var updated = booking
+        updated.status = newStatus
+        if let connectionStatus = BookingStateMachine.connectionStatusAfterTransition(
+            from: booking.status,
+            to: newStatus,
+            actor: actor
+        ) {
+            try await upsertConnectionForBooking(booking: updated, status: connectionStatus)
+        }
+        return updated
+    }
+
     func deleteBooking(bookingId: String) async throws {
         try await db.collection("bookings").document(bookingId).delete()
     }

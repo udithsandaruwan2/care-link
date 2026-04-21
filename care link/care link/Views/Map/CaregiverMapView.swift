@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import FirebaseAuth
 
 struct CaregiverMapView: View {
     @Environment(AppState.self) private var appState
@@ -7,6 +8,8 @@ struct CaregiverMapView: View {
     @State private var viewModel = MapViewModel()
     @State private var showCaregiverProfile = false
     @State private var searchDebounceTask: Task<Void, Never>?
+    @State private var blockingActiveBooking: Booking?
+    @State private var showMyCareHub = false
 
     var body: some View {
         NavigationStack {
@@ -58,6 +61,43 @@ struct CaregiverMapView: View {
                             .padding(.bottom, emptyStateBottomInset)
                     }
                 }
+
+                if let booking = blockingActiveBooking {
+                    Color.black.opacity(0.42)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(true)
+
+                    VStack(spacing: CLTheme.spacingMD) {
+                        Image(systemName: "calendar.badge.exclamationmark")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.white)
+                        Text("Active care request")
+                            .font(CLTheme.title2Font)
+                            .foregroundStyle(.white)
+                        Text("You already have an open visit with \(booking.caregiverName). Finish or cancel it in My care hub before browsing the map for another caregiver.")
+                            .font(CLTheme.calloutFont)
+                            .foregroundStyle(.white.opacity(0.92))
+                            .multilineTextAlignment(.center)
+                        Button {
+                            showMyCareHub = true
+                        } label: {
+                            Text("Open My care hub")
+                                .font(CLTheme.calloutFont.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .foregroundStyle(CLTheme.primaryNavy)
+                                .background(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(CLTheme.spacingLG)
+                    .frame(maxWidth: .infinity)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusXL, style: .continuous))
+                    .padding(.horizontal, CLTheme.spacingLG)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
             }
             .navigationTitle("Map")
             .navigationBarTitleDisplayMode(.inline)
@@ -67,9 +107,14 @@ struct CaregiverMapView: View {
                         .environment(appState)
                 }
             }
+            .navigationDestination(isPresented: $showMyCareHub) {
+                MyCareHubView()
+                    .environment(appState)
+            }
             .task {
                 await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
                 appState.locationService.requestPermission()
+                await refreshBlockingBookingIfNeeded()
             }
             .onChange(of: viewModel.searchText) { _, _ in
                 searchDebounceTask?.cancel()
@@ -100,6 +145,7 @@ struct CaregiverMapView: View {
 
     private func mapPin(for caregiver: Caregiver) -> some View {
         Button {
+            guard blockingActiveBooking == nil else { return }
             withAnimation(.spring(response: 0.3)) {
                 viewModel.selectCaregiver(caregiver)
             }
@@ -233,6 +279,18 @@ struct CaregiverMapView: View {
         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.bottom, CLTheme.spacingMD)
+    }
+
+    private func refreshBlockingBookingIfNeeded() async {
+        guard appState.currentUserRole == .user else {
+            await MainActor.run { blockingActiveBooking = nil }
+            return
+        }
+        let uid = appState.authService.currentUser?.uid ?? ""
+        guard !uid.isEmpty else { return }
+        let list = (try? await appState.firestoreService.fetchBookings(for: uid)) ?? []
+        let blocking = list.first { $0.status.blocksNewBookingRequest }
+        await MainActor.run { blockingActiveBooking = blocking }
     }
 
     private func chip(_ title: String, selected: Bool) -> some View {
