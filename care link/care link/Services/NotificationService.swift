@@ -5,6 +5,7 @@ import UserNotifications
 final class NotificationService {
     var isAuthorized = false
     var notifications: [CLNotification] = []
+    private var seenNotificationIds: Set<String> = []
 
     func requestAuthorization() async {
         do {
@@ -55,6 +56,19 @@ final class NotificationService {
         notifications.insert(notification, at: 0)
     }
 
+    func syncNotifications(_ incoming: [CLNotification]) {
+        let sorted = incoming.sorted { $0.createdAt > $1.createdAt }
+        let previous = seenNotificationIds
+        notifications = sorted
+        seenNotificationIds = Set(sorted.map(\.id))
+
+        // Fire local in-app push for newly-arrived unread notifications.
+        let newUnread = sorted.filter { !previous.contains($0.id) && !$0.isRead }
+        for item in newUnread {
+            scheduleLocalNotification(title: item.title, body: item.message, timeInterval: 1)
+        }
+    }
+
     func markAsRead(_ id: String) {
         if let index = notifications.firstIndex(where: { $0.id == id }) {
             notifications[index].isRead = true
@@ -65,6 +79,11 @@ final class NotificationService {
         for i in notifications.indices {
             notifications[i].isRead = true
         }
+    }
+
+    func clear() {
+        notifications = []
+        seenNotificationIds.removeAll()
     }
 
     var unreadCount: Int {

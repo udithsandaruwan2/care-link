@@ -401,6 +401,18 @@ struct CaregiverProfileView: View {
             )
             do {
                 try await appState.firestoreService.createConnection(connection)
+                try? await appState.firestoreService.createNotification(
+                    CLNotification(
+                        id: UUID().uuidString,
+                        userId: caregiver.id,
+                        senderUserId: userId,
+                        title: "New connection request",
+                        message: "\(userName) requested an ongoing care connection.",
+                        type: .connectionRequest,
+                        isRead: false,
+                        createdAt: Date()
+                    )
+                )
                 existingConnection = connection
             } catch {
                 print("Connection request failed: \(error)")

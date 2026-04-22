@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct AlertsView: View {
     @Environment(AppState.self) private var appState
@@ -14,6 +15,11 @@ struct AlertsView: View {
                     if appState.notificationService.unreadCount > 0 {
                         Button {
                             appState.notificationService.markAllAsRead()
+                            Task {
+                                let uid = appState.authService.currentUser?.uid ?? ""
+                                guard !uid.isEmpty else { return }
+                                try? await appState.firestoreService.markAllNotificationsRead(userId: uid)
+                            }
                         } label: {
                             Text("Mark all read")
                                 .font(CLTheme.calloutFont.weight(.semibold))
@@ -50,6 +56,11 @@ struct AlertsView: View {
     private func notificationRow(_ notification: CLNotification) -> some View {
         Button {
             appState.notificationService.markAsRead(notification.id)
+            Task {
+                let uid = appState.authService.currentUser?.uid ?? ""
+                guard !uid.isEmpty else { return }
+                try? await appState.firestoreService.markNotificationRead(userId: uid, notificationId: notification.id)
+            }
         } label: {
             HStack(alignment: .top, spacing: CLTheme.spacingMD) {
                 ZStack {

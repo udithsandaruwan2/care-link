@@ -5,6 +5,7 @@ import FirebaseFirestore
 final class FirestoreService {
     private var db: Firestore { Firestore.firestore() }
     private var userBookingsListener: ListenerRegistration?
+    private var userNotificationsListener: ListenerRegistration?
 
     private func encodeAndSet<T: Encodable>(_ value: T, at ref: DocumentReference, merge: Bool = false) async throws {
         let data = try Firestore.Encoder().encode(value)
@@ -129,6 +130,64 @@ final class FirestoreService {
         userBookingsListener = nil
     }
 
+    // MARK: - Notifications
+
+    func createNotification(_ notification: CLNotification) async throws {
+        let ref = db.collection("users")
+            .document(notification.userId)
+            .collection("notifications")
+            .document(notification.id)
+        try await encodeAndSet(notification, at: ref)
+    }
+
+    func listenToNotificationsForUser(
+        _ userId: String,
+        onUpdate: @escaping ([CLNotification]) -> Void
+    ) {
+        stopListeningToNotificationsForUser()
+        guard !userId.isEmpty else {
+            onUpdate([])
+            return
+        }
+
+        userNotificationsListener = db.collection("users")
+            .document(userId)
+            .collection("notifications")
+            .order(by: "createdAt", descending: true)
+            .addSnapshotListener { snapshot, _ in
+                guard let snapshot else { return }
+                let items = snapshot.documents.compactMap { try? $0.data(as: CLNotification.self) }
+                onUpdate(items)
+            }
+    }
+
+    func stopListeningToNotificationsForUser() {
+        userNotificationsListener?.remove()
+        userNotificationsListener = nil
+    }
+
+    func markNotificationRead(userId: String, notificationId: String) async throws {
+        try await db.collection("users")
+            .document(userId)
+            .collection("notifications")
+            .document(notificationId)
+            .updateData(["isRead": true])
+    }
+
+    func markAllNotificationsRead(userId: String) async throws {
+        let snapshot = try await db.collection("users")
+            .document(userId)
+            .collection("notifications")
+            .whereField("isRead", isEqualTo: false)
+            .getDocuments()
+
+        let batch = db.batch()
+        for doc in snapshot.documents {
+            batch.updateData(["isRead": true], forDocument: doc.reference)
+        }
+        try await batch.commit()
+    }
+
     func fetchCaregiverBookings(for caregiverId: String) async throws -> [Booking] {
         let snapshot = try await db.collection("bookings")
             .whereField("caregiverId", isEqualTo: caregiverId)
@@ -174,7 +233,87 @@ final class FirestoreService {
         ) {
             try await upsertConnectionForBooking(booking: updated, status: connectionStatus)
         }
+
+        try? await createBookingTransitionNotifications(
+            previous: booking,
+            updated: updated,
+            actor: actor,
+            callerUid: callerUid
+        )
         return updated
+    }
+
+    private func createBookingTransitionNotifications(
+        previous: Booking,
+        updated: Booking,
+        actor: BookingStateMachine.Actor,
+        callerUid: String
+    ) async throws {
+        let patientId = updated.userId
+        let caregiverId = updated.caregiverId
+
+        func make(
+            to userId: String,
+            title: String,
+            message: String,
+            type: CLNotification.NotificationType
+        ) async throws {
+            let note = CLNotification(
+                id: UUID().uuidString,
+                userId: userId,
+                senderUserId: callerUid,
+                title: title,
+                message: message,
+                type: type,
+                isRead: false,
+                createdAt: Date(),
+                bookingId: updated.id
+            )
+            try await createNotification(note)
+        }
+
+        switch updated.status {
+        case .confirmed:
+            if actor == .caregiver {
+                try await make(
+                    to: patientId,
+                    title: "Booking confirmed",
+                    message: "\(updated.caregiverName) confirmed your booking.",
+                    type: .bookingConfirmed
+                )
+                try await make(
+                    to: patientId,
+                    title: "Upcoming appointment reminder",
+                    message: "Care visit with \(updated.caregiverName) is scheduled for \(updated.startTime.formatted(date: .omitted, time: .shortened)).",
+                    type: .bookingReminder
+                )
+            }
+        case .cancelled:
+            let receiver = callerUid == patientId ? caregiverId : patientId
+            let senderLabel = callerUid == patientId ? "Patient" : updated.caregiverName
+            try await make(
+                to: receiver,
+                title: "Booking cancelled",
+                message: "\(senderLabel) cancelled the booking request.",
+                type: .bookingCancelled
+            )
+        case .inProgress:
+            try await make(
+                to: patientId,
+                title: "Visit started",
+                message: "\(updated.caregiverName) marked your booking as in progress.",
+                type: .statusUpdate
+            )
+        case .completed:
+            try await make(
+                to: patientId,
+                title: "Visit completed",
+                message: "\(updated.caregiverName) marked your booking as completed.",
+                type: .statusUpdate
+            )
+        case .awaitingCaregiver, .pending:
+            break
+        }
     }
 
     func deleteBooking(bookingId: String) async throws {
@@ -303,26 +442,41 @@ final class FirestoreService {
     }
 
     func fetchMedicalRecordsForPatient(_ patientId: String) async throws -> [MedicalRecord] {
-        let snapshot = try await db.collection("medicalRecords")
+        let baseQuery = db.collection("medicalRecords")
             .whereField("patientId", isEqualTo: patientId)
-            .order(by: "date", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: MedicalRecord.self)
+        do {
+            let snapshot = try await baseQuery
+                .order(by: "date", descending: true)
+                .getDocuments()
+            return snapshot.documents.compactMap { try? $0.data(as: MedicalRecord.self) }
+        } catch {
+            let fallback = try await baseQuery.getDocuments()
+            return fallback.documents
+                .compactMap { try? $0.data(as: MedicalRecord.self) }
+                .sorted { $0.date > $1.date }
         }
     }
 
     func fetchMedicalRecordsByCaregiver(_ caregiverId: String, patientId: String) async throws -> [MedicalRecord] {
-        let snapshot = try await db.collection("medicalRecords")
+        let baseQuery = db.collection("medicalRecords")
             .whereField("caregiverId", isEqualTo: caregiverId)
             .whereField("patientId", isEqualTo: patientId)
-            .order(by: "date", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: MedicalRecord.self)
+        do {
+            let snapshot = try await baseQuery
+                .order(by: "date", descending: true)
+                .getDocuments()
+            return snapshot.documents.compactMap { try? $0.data(as: MedicalRecord.self) }
+        } catch {
+            let fallback = try await baseQuery.getDocuments()
+            return fallback.documents
+                .compactMap { try? $0.data(as: MedicalRecord.self) }
+                .sorted { $0.date > $1.date }
         }
+    }
+
+    /// Caregiver-facing patient chart should show all records for that patient, not only records created by current caregiver.
+    func fetchMedicalRecordsForCaregiverPatient(_ patientId: String) async throws -> [MedicalRecord] {
+        try await fetchMedicalRecordsForPatient(patientId)
     }
 
     // MARK: - Family Members

@@ -122,6 +122,32 @@ final class BookingViewModel {
                 booking: booking,
                 status: .pending
             )
+            try? await firestoreService.createNotification(
+                CLNotification(
+                    id: UUID().uuidString,
+                    userId: caregiver.id,
+                    senderUserId: userId,
+                    title: "New booking request",
+                    message: "\(patientName) requested care on \(booking.date.formatted(date: .abbreviated, time: .omitted)).",
+                    type: .bookingRequest,
+                    isRead: false,
+                    createdAt: Date(),
+                    bookingId: booking.id
+                )
+            )
+            try? await firestoreService.createNotification(
+                CLNotification(
+                    id: UUID().uuidString,
+                    userId: userId,
+                    senderUserId: userId,
+                    title: "Request sent",
+                    message: "Your booking request to \(caregiver.name) was sent.",
+                    type: .statusUpdate,
+                    isRead: false,
+                    createdAt: Date(),
+                    bookingId: booking.id
+                )
+            )
             let conversation = try await chatService.getOrCreateConversation(
                 userId: userId,
                 userName: patientName,

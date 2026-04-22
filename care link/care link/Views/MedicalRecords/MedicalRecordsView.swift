@@ -6,11 +6,14 @@ struct MedicalRecordsView: View {
     @Environment(\.dismiss) private var dismiss
     let patientId: String
     let patientName: String
+    var startInAddMode: Bool = false
 
     @State private var records: [MedicalRecord] = []
     @State private var isLoading = true
     @State private var showAddRecord = false
     @State private var selectedType: MedicalRecord.RecordType?
+    @State private var didAutoPresentAdd = false
+    @State private var loadErrorMessage: String?
 
     private var isCaregiver: Bool {
         appState.currentUserRole == .caregiver
@@ -29,6 +32,26 @@ struct MedicalRecordsView: View {
             if isLoading {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let loadErrorMessage {
+                VStack(spacing: CLTheme.spacingMD) {
+                    Spacer()
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(CLTheme.warningOrange)
+                    Text("Could not load records")
+                        .font(CLTheme.headlineFont)
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Text(loadErrorMessage)
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, CLTheme.spacingXL)
+                    Button("Try again") {
+                        Task { await loadRecords() }
+                    }
+                    .font(CLTheme.calloutFont.weight(.semibold))
+                    Spacer()
+                }
             } else if filteredRecords.isEmpty {
                 emptyState
             } else {
@@ -71,6 +94,12 @@ struct MedicalRecordsView: View {
         }
         .task {
             await loadRecords()
+        }
+        .onAppear {
+            if startInAddMode, isCaregiver, !didAutoPresentAdd {
+                didAutoPresentAdd = true
+                showAddRecord = true
+            }
         }
     }
 
@@ -200,11 +229,16 @@ struct MedicalRecordsView: View {
     }
 
     private func loadRecords() async {
-        if isCaregiver {
-            let caregiverId = appState.authService.currentUser?.uid ?? ""
-            records = (try? await appState.firestoreService.fetchMedicalRecordsByCaregiver(caregiverId, patientId: patientId)) ?? []
-        } else {
-            records = (try? await appState.firestoreService.fetchMedicalRecordsForPatient(patientId)) ?? []
+        do {
+            if isCaregiver {
+                records = try await appState.firestoreService.fetchMedicalRecordsForCaregiverPatient(patientId)
+            } else {
+                records = try await appState.firestoreService.fetchMedicalRecordsForPatient(patientId)
+            }
+            loadErrorMessage = nil
+        } catch {
+            records = []
+            loadErrorMessage = error.localizedDescription
         }
         isLoading = false
     }

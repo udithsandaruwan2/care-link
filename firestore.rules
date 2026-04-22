@@ -24,6 +24,14 @@ service cloud.firestore {
       allow create: if isUser(userId) && request.resource.data.id == userId;
       allow update: if isUser(userId);
       allow delete: if isUser(userId);
+
+      match /notifications/{notificationId} {
+        allow read: if isUser(userId);
+        allow create: if signedIn() &&
+          request.resource.data.userId == userId &&
+          request.resource.data.senderUserId == request.auth.uid;
+        allow update, delete: if isUser(userId);
+      }
     }
 
     match /caregivers/{caregiverId} {

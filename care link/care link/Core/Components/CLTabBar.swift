@@ -4,7 +4,7 @@ enum CLTab: String, CaseIterable {
     case home = "HOME"
     case chat = "CHAT"
     case map = "MAP"
-    case alerts = "ALERTS"
+    case alerts = "NOTIFS"
     case profile = "PROFILE"
 
     var icon: String {

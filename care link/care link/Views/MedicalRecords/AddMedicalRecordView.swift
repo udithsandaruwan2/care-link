@@ -14,6 +14,8 @@ struct AddMedicalRecordView: View {
     @State private var selectedType: MedicalRecord.RecordType = .note
     @State private var date = Date()
     @State private var isSaving = false
+    @State private var showSaveError = false
+    @State private var saveErrorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -101,6 +103,11 @@ struct AddMedicalRecordView: View {
                         .foregroundStyle(CLTheme.textSecondary)
                 }
             }
+            .alert("Could not save record", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveErrorMessage)
+            }
         }
     }
 
@@ -152,6 +159,14 @@ struct AddMedicalRecordView: View {
         isSaving = true
         Task {
             let caregiverId = appState.authService.currentUser?.uid ?? ""
+            guard !caregiverId.isEmpty else {
+                await MainActor.run {
+                    isSaving = false
+                    saveErrorMessage = "You must be logged in as a caregiver to add records."
+                    showSaveError = true
+                }
+                return
+            }
             let caregiverName = appState.authService.userProfile?.fullName ?? "Caregiver"
 
             let record = MedicalRecord(
@@ -170,12 +185,30 @@ struct AddMedicalRecordView: View {
 
             do {
                 try await appState.firestoreService.addMedicalRecord(record)
-                onSave()
-                dismiss()
+                try? await appState.firestoreService.createNotification(
+                    CLNotification(
+                        id: UUID().uuidString,
+                        userId: patientId,
+                        senderUserId: caregiverId,
+                        title: "New medical record",
+                        message: "\(caregiverName) added \"\(title)\" to your records.",
+                        type: .statusUpdate,
+                        isRead: false,
+                        createdAt: Date()
+                    )
+                )
+                await MainActor.run {
+                    onSave()
+                    isSaving = false
+                    dismiss()
+                }
             } catch {
-                print("Failed to save record: \(error)")
+                await MainActor.run {
+                    isSaving = false
+                    saveErrorMessage = error.localizedDescription
+                    showSaveError = true
+                }
             }
-            isSaving = false
         }
     }
 }

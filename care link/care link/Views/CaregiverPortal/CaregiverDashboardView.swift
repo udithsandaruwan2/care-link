@@ -11,6 +11,7 @@ struct CaregiverDashboardView: View {
     @State private var showMedicalRecords = false
     @State private var selectedPatientId = ""
     @State private var selectedPatientName = ""
+    @State private var openAddMedicalRecordMode = false
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
     @State private var showEditProfile = false
@@ -43,7 +44,11 @@ struct CaregiverDashboardView: View {
             }
             .background(CLTheme.backgroundPrimary)
             .navigationDestination(isPresented: $showMedicalRecords) {
-                MedicalRecordsView(patientId: selectedPatientId, patientName: selectedPatientName)
+                MedicalRecordsView(
+                    patientId: selectedPatientId,
+                    patientName: selectedPatientName,
+                    startInAddMode: openAddMedicalRecordMode
+                )
                     .environment(appState)
             }
             .navigationDestination(isPresented: $showChat) {
@@ -159,6 +164,7 @@ struct CaregiverDashboardView: View {
                         Button {
                             selectedPatientId = booking.userId
                             selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+                            openAddMedicalRecordMode = false
                             showMedicalRecords = true
                         } label: {
                             Label("Records", systemImage: "doc.text.fill")
@@ -173,6 +179,7 @@ struct CaregiverDashboardView: View {
                         Button {
                             selectedPatientId = booking.userId
                             selectedPatientName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+                            openAddMedicalRecordMode = true
                             showMedicalRecords = true
                         } label: {
                             Label("Add record", systemImage: "plus.circle.fill")
@@ -401,6 +408,7 @@ struct CaregiverDashboardView: View {
                 Button {
                     selectedPatientId = patient.id
                     selectedPatientName = patient.fullName
+                    openAddMedicalRecordMode = false
                     showMedicalRecords = true
                 } label: {
                     Image(systemName: "doc.text.fill")
@@ -660,7 +668,20 @@ struct CaregiverDashboardView: View {
     }
 
     private func approveConnection(_ connection: Connection) async {
+        let caregiverId = appState.authService.currentUser?.uid ?? ""
         try? await appState.firestoreService.updateConnectionStatus(connectionId: connection.id, status: .approved)
+        try? await appState.firestoreService.createNotification(
+            CLNotification(
+                id: UUID().uuidString,
+                userId: connection.userId,
+                senderUserId: caregiverId,
+                title: "Connection approved",
+                message: "\(connection.caregiverName) approved your connection request.",
+                type: .connectionApproved,
+                isRead: false,
+                createdAt: Date()
+            )
+        )
         pendingConnections.removeAll { $0.id == connection.id }
         if let user = try? await appState.firestoreService.fetchUser(connection.userId) {
             connectedPatients.append(user)
@@ -668,7 +689,20 @@ struct CaregiverDashboardView: View {
     }
 
     private func rejectConnection(_ connection: Connection) async {
+        let caregiverId = appState.authService.currentUser?.uid ?? ""
         try? await appState.firestoreService.updateConnectionStatus(connectionId: connection.id, status: .rejected)
+        try? await appState.firestoreService.createNotification(
+            CLNotification(
+                id: UUID().uuidString,
+                userId: connection.userId,
+                senderUserId: caregiverId,
+                title: "Connection request declined",
+                message: "\(connection.caregiverName) declined your connection request.",
+                type: .connectionRequest,
+                isRead: false,
+                createdAt: Date()
+            )
+        )
         pendingConnections.removeAll { $0.id == connection.id }
     }
 

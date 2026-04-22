@@ -124,6 +124,22 @@ final class ChatService {
             unreadField: FieldValue.increment(Int64(1))
         ], forDocument: db.collection("conversations").document(conversationId))
         try await batch.commit()
+
+        let receiverId = senderId == conversation.userId ? conversation.caregiverId : conversation.userId
+        let notification = CLNotification(
+            id: UUID().uuidString,
+            userId: receiverId,
+            senderUserId: senderId,
+            title: "New message",
+            message: "\(senderName): \(text)",
+            type: .newMessage,
+            isRead: false,
+            createdAt: Date(),
+            conversationId: conversationId
+        )
+        let nref = db.collection("users").document(receiverId).collection("notifications").document(notification.id)
+        let ndata = try Firestore.Encoder().encode(notification)
+        try? await nref.setData(ndata)
     }
 
     /// Sends a structured booking request bubble (caregiver can accept/decline from chat).
@@ -162,6 +178,23 @@ final class ChatService {
             unreadField: FieldValue.increment(Int64(1))
         ], forDocument: db.collection("conversations").document(conversationId))
         try await batch.commit()
+
+        let receiverId = senderId == conversation.userId ? conversation.caregiverId : conversation.userId
+        let notification = CLNotification(
+            id: UUID().uuidString,
+            userId: receiverId,
+            senderUserId: senderId,
+            title: "Booking request in chat",
+            message: "\(senderName) sent a booking request card.",
+            type: .bookingRequest,
+            isRead: false,
+            createdAt: Date(),
+            bookingId: booking.id,
+            conversationId: conversationId
+        )
+        let nref = db.collection("users").document(receiverId).collection("notifications").document(notification.id)
+        let ndata = try Firestore.Encoder().encode(notification)
+        try? await nref.setData(ndata)
     }
 
     // MARK: - Create Conversation

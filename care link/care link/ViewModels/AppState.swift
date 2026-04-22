@@ -49,6 +49,7 @@ final class AppState {
                             needsCaregiverRegistration = true
                         }
                         startChatListener()
+                        startNotificationsListener()
                     } else {
                         needsProfileSetup = true
                     }
@@ -129,6 +130,15 @@ final class AppState {
         chatService.listenToConversations(userId: uid, role: currentUserRole)
     }
 
+    func startNotificationsListener() {
+        guard let uid = authService.currentUser?.uid else { return }
+        firestoreService.listenToNotificationsForUser(uid) { [weak self] items in
+            Task { @MainActor in
+                self?.notificationService.syncNotifications(items)
+            }
+        }
+    }
+
     func completeOnboarding() {
         isOnboardingComplete = true
     }
@@ -151,6 +161,8 @@ final class AppState {
 
     func signOut() {
         chatService.stopAllListeners()
+        firestoreService.stopListeningToNotificationsForUser()
+        notificationService.clear()
         try? authService.signOut()
         isAuthenticated = false
         needsCaregiverRegistration = false
@@ -163,6 +175,8 @@ final class AppState {
 
     func clearAllData() {
         chatService.stopAllListeners()
+        firestoreService.stopListeningToNotificationsForUser()
+        notificationService.clear()
         try? authService.signOut()
 
         let defaults = UserDefaults.standard

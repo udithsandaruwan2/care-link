@@ -185,14 +185,18 @@ struct ProfileView: View {
                 profileMenuRow(icon: "person", title: "Edit Profile", subtitle: "Update your personal details") {
                     showEditProfile = true
                 }
-                profileMenuRow(icon: "person.3", title: "Family Members", subtitle: "Manage your care circle profiles") {
-                    showFamilyMembers = true
+                if appState.currentUserRole == .user {
+                    profileMenuRow(icon: "person.3", title: "Family Members", subtitle: "Manage your care circle profiles") {
+                        showFamilyMembers = true
+                    }
                 }
                 profileMenuRow(icon: "creditcard", title: "Payment Methods", subtitle: "Manage cards and billing") {
                     showPaymentMethods = true
                 }
-                profileMenuRow(icon: "doc.text", title: "Medical Records", subtitle: "View your health records") {
-                    showMedicalRecords = true
+                if appState.currentUserRole == .user {
+                    profileMenuRow(icon: "doc.text", title: "Medical Records", subtitle: "View your health records") {
+                        showMedicalRecords = true
+                    }
                 }
             }
             .padding(.horizontal, CLTheme.spacingMD)

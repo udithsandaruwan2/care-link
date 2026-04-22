@@ -232,8 +232,21 @@ struct ConnectionRequestsView: View {
 
     private func approveConnection(_ connection: Connection) async {
         do {
+            let caregiverId = appState.authService.currentUser?.uid ?? ""
             try await appState.firestoreService.updateConnectionStatus(
                 connectionId: connection.id, status: .approved
+            )
+            try? await appState.firestoreService.createNotification(
+                CLNotification(
+                    id: UUID().uuidString,
+                    userId: connection.userId,
+                    senderUserId: caregiverId,
+                    title: "Connection approved",
+                    message: "\(connection.caregiverName) approved your connection request.",
+                    type: .connectionApproved,
+                    isRead: false,
+                    createdAt: Date()
+                )
             )
             pendingConnections.removeAll { $0.id == connection.id }
             var approved = connection
@@ -244,8 +257,21 @@ struct ConnectionRequestsView: View {
 
     private func rejectConnection(_ connection: Connection) async {
         do {
+            let caregiverId = appState.authService.currentUser?.uid ?? ""
             try await appState.firestoreService.updateConnectionStatus(
                 connectionId: connection.id, status: .rejected
+            )
+            try? await appState.firestoreService.createNotification(
+                CLNotification(
+                    id: UUID().uuidString,
+                    userId: connection.userId,
+                    senderUserId: caregiverId,
+                    title: "Connection declined",
+                    message: "\(connection.caregiverName) declined your request.",
+                    type: .connectionRequest,
+                    isRead: false,
+                    createdAt: Date()
+                )
             )
             pendingConnections.removeAll { $0.id == connection.id }
         } catch {}
