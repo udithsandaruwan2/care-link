@@ -1,25 +1,49 @@
 import SwiftUI
+import UIKit
 
 enum CLTheme {
     // MARK: - Colors
-    static let primaryNavy = Color(hex: "003366")
-    static let accentBlue = Color(hex: "0066CC")
-    static let lightBlue = Color(hex: "E8F0FE")
+    static let primaryNavy = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.52, green: 0.73, blue: 0.98, alpha: 1.0)
+            : UIColor(red: 0.00, green: 0.20, blue: 0.40, alpha: 1.0)
+    })
+    static let accentBlue = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.34, green: 0.62, blue: 0.98, alpha: 1.0)
+            : UIColor(red: 0.00, green: 0.40, blue: 0.80, alpha: 1.0)
+    })
+    static let lightBlue = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.12, green: 0.21, blue: 0.36, alpha: 1.0)
+            : UIColor(red: 0.91, green: 0.94, blue: 0.99, alpha: 1.0)
+    })
     static let tealAccent = Color(hex: "0D9488")
     static let successGreen = Color(hex: "16A34A")
     static let warningOrange = Color(hex: "F59E0B")
     static let errorRed = Color(hex: "DC2626")
-    static let backgroundPrimary = Color(hex: "F8FAFC")
-    static let backgroundSecondary = Color(hex: "F1F5F9")
-    static let cardBackground = Color.white
-    static let textPrimary = Color(hex: "1E293B")
-    static let textSecondary = Color(hex: "64748B")
-    static let textTertiary = Color(hex: "94A3B8")
-    static let divider = Color(hex: "E2E8F0")
+    static let backgroundPrimary = Color(uiColor: .systemBackground)
+    static let backgroundSecondary = Color(uiColor: .secondarySystemBackground)
+    static let cardBackground = Color(uiColor: .tertiarySystemBackground)
+    static let textPrimary = Color(uiColor: .label)
+    static let textSecondary = Color(uiColor: .secondaryLabel)
+    static let textTertiary = Color(uiColor: .tertiaryLabel)
+    static let divider = Color(uiColor: .separator)
     static let starYellow = Color(hex: "F59E0B")
 
     static let gradientBlue = LinearGradient(
-        colors: [Color(hex: "004080"), Color(hex: "0066CC")],
+        colors: [
+            Color(uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0.08, green: 0.20, blue: 0.35, alpha: 1.0)
+                    : UIColor(red: 0.00, green: 0.25, blue: 0.50, alpha: 1.0)
+            }),
+            Color(uiColor: UIColor { trait in
+                trait.userInterfaceStyle == .dark
+                    ? UIColor(red: 0.10, green: 0.33, blue: 0.60, alpha: 1.0)
+                    : UIColor(red: 0.00, green: 0.40, blue: 0.80, alpha: 1.0)
+            })
+        ],
         startPoint: .leading,
         endPoint: .trailing
     )
@@ -57,7 +81,7 @@ enum CLTheme {
     }
 
     // MARK: - Shadow
-    static let shadowLight = Color.black.opacity(0.05)
-    static let shadowMedium = Color.black.opacity(0.1)
-    static let shadowHeavy = Color.black.opacity(0.15)
+    static let shadowLight = Color.black.opacity(0.14)
+    static let shadowMedium = Color.black.opacity(0.2)
+    static let shadowHeavy = Color.black.opacity(0.28)
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     var onComplete: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var currentPage = 0
 
     private let pages: [OnboardingPage] = [
@@ -13,7 +14,8 @@ struct OnboardingView: View {
             iconColor: "0D9488",
             badgeText: "Trusted by 10k+",
             badgeIcon: "heart.fill",
-            gradient: [Color(hex: "E0F2FE"), Color(hex: "BAE6FD")]
+            lightGradient: [Color(hex: "E0F2FE"), Color(hex: "BAE6FD")],
+            darkGradient: [Color(hex: "1B2F4A"), Color(hex: "1E3A5F")]
         ),
         OnboardingPage(
             title: "Smart Matching,\nYour Way.",
@@ -22,7 +24,8 @@ struct OnboardingView: View {
             iconColor: "0D9488",
             badgeText: "Top Match",
             badgeIcon: "star.fill",
-            gradient: [Color(hex: "E8EAF0"), Color(hex: "D1D5DB")]
+            lightGradient: [Color(hex: "E8EAF0"), Color(hex: "D1D5DB")],
+            darkGradient: [Color(hex: "2A2F3B"), Color(hex: "374151")]
         ),
         OnboardingPage(
             title: "Security is Our\nPriority.",
@@ -31,7 +34,8 @@ struct OnboardingView: View {
             iconColor: "0066CC",
             badgeText: "HIPAA Compliant",
             badgeIcon: "lock.shield.fill",
-            gradient: [Color(hex: "E0F7FA"), Color(hex: "B2EBF2")]
+            lightGradient: [Color(hex: "E0F7FA"), Color(hex: "B2EBF2")],
+            darkGradient: [Color(hex: "0F3A3E"), Color(hex: "155E63")]
         )
     ]
 
@@ -116,7 +120,7 @@ struct OnboardingView: View {
                 CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusHero)
                     .fill(
                         LinearGradient(
-                            colors: page.gradient,
+                            colors: colorScheme == .dark ? page.darkGradient : page.lightGradient,
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -174,7 +178,8 @@ struct OnboardingPage {
     let iconColor: String
     let badgeText: String
     let badgeIcon: String
-    let gradient: [Color]
+    let lightGradient: [Color]
+    let darkGradient: [Color]
 }
 
 #Preview {
