@@ -13,6 +13,7 @@ struct Caregiver: Identifiable, Codable, Sendable, Hashable {
     var distance: Double
     var bio: String
     var skills: [String]
+    var education: [String]
     var certifications: [String]
     var availability: [String]
     var imageURL: String
@@ -39,7 +40,30 @@ struct Caregiver: Identifiable, Codable, Sendable, Hashable {
         lhs.id == rhs.id
     }
 
-    init(id: String, userId: String, name: String, specialty: String, title: String, hourlyRate: Double, rating: Double, reviewCount: Int, experienceYears: Int, distance: Double, bio: String, skills: [String], certifications: [String], availability: [String], imageURL: String, latitude: Double, longitude: Double, isVerified: Bool, category: CareCategory, phoneNumber: String, email: String) {
+    init(
+        id: String,
+        userId: String,
+        name: String,
+        specialty: String,
+        title: String,
+        hourlyRate: Double,
+        rating: Double,
+        reviewCount: Int,
+        experienceYears: Int,
+        distance: Double,
+        bio: String,
+        skills: [String],
+        education: [String] = [],
+        certifications: [String],
+        availability: [String],
+        imageURL: String,
+        latitude: Double,
+        longitude: Double,
+        isVerified: Bool,
+        category: CareCategory,
+        phoneNumber: String,
+        email: String
+    ) {
         self.id = id
         self.userId = userId
         self.name = name
@@ -52,6 +76,7 @@ struct Caregiver: Identifiable, Codable, Sendable, Hashable {
         self.distance = distance
         self.bio = bio
         self.skills = skills
+        self.education = education
         self.certifications = certifications
         self.availability = availability
         self.imageURL = imageURL
@@ -77,6 +102,7 @@ struct Caregiver: Identifiable, Codable, Sendable, Hashable {
         distance = try container.decodeIfPresent(Double.self, forKey: .distance) ?? 0
         bio = try container.decodeIfPresent(String.self, forKey: .bio) ?? ""
         skills = try container.decodeIfPresent([String].self, forKey: .skills) ?? []
+        education = try container.decodeIfPresent([String].self, forKey: .education) ?? []
         certifications = try container.decodeIfPresent([String].self, forKey: .certifications) ?? []
         availability = try container.decodeIfPresent([String].self, forKey: .availability) ?? []
         imageURL = try container.decodeIfPresent(String.self, forKey: .imageURL) ?? ""

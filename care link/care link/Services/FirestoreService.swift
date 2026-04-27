@@ -1,6 +1,12 @@
 import Foundation
 import FirebaseFirestore
 
+struct CaregiverActivePatientSelection: Sendable {
+    let patientId: String
+    let patientName: String
+    let updatedAt: Date
+}
+
 @Observable
 final class FirestoreService {
     private var db: Firestore { Firestore.firestore() }
@@ -517,6 +523,51 @@ final class FirestoreService {
 
     func updateUser(_ user: CLUser) async throws {
         try await encodeAndSet(user, at: db.collection("users").document(user.id), merge: true)
+    }
+
+    // MARK: - Caregiver Active Patient
+
+    /// Persists a single active patient for the caregiver on their user document.
+    func setActivePatientForCaregiver(
+        caregiverId: String,
+        patientId: String,
+        patientName: String
+    ) async throws {
+        try await db.collection("users").document(caregiverId).updateData([
+            "activePatientId": patientId,
+            "activePatientName": patientName,
+            "activePatientUpdatedAt": Timestamp(date: Date())
+        ])
+    }
+
+    func clearActivePatientForCaregiver(caregiverId: String) async throws {
+        try await db.collection("users").document(caregiverId).updateData([
+            "activePatientId": FieldValue.delete(),
+            "activePatientName": FieldValue.delete(),
+            "activePatientUpdatedAt": FieldValue.delete()
+        ])
+    }
+
+    func fetchActivePatientForCaregiver(caregiverId: String) async throws -> CaregiverActivePatientSelection? {
+        let snapshot = try await db.collection("users").document(caregiverId).getDocument()
+        guard let data = snapshot.data(),
+              let patientId = data["activePatientId"] as? String,
+              !patientId.isEmpty else {
+            return nil
+        }
+
+        let patientName = (data["activePatientName"] as? String) ?? "Patient"
+        let updatedAt: Date
+        if let ts = data["activePatientUpdatedAt"] as? Timestamp {
+            updatedAt = ts.dateValue()
+        } else {
+            updatedAt = Date()
+        }
+        return CaregiverActivePatientSelection(
+            patientId: patientId,
+            patientName: patientName,
+            updatedAt: updatedAt
+        )
     }
 
     // MARK: - Connected Patients (for caregivers)

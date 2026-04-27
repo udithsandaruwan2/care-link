@@ -91,6 +91,10 @@ struct HomeView: View {
                 )
                 await loadActiveConnection()
                 await loadActiveBookingCard(from: history)
+                if UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") {
+                    await appState.healthKitService.refreshAuthorizationStatus()
+                    await appState.healthKitService.refreshMetrics()
+                }
             }
             .onChange(of: appState.navigationResetToken) { _, _ in
                 navigationPath = NavigationPath()
@@ -106,6 +110,12 @@ struct HomeView: View {
                 Text("This will cancel your current caregiver request.")
             }
             .onAppear { syncMainTabBarVisibility() }
+            .onAppear {
+                Task {
+                    guard UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") else { return }
+                    await appState.healthKitService.refreshMetrics()
+                }
+            }
             .onAppear {
                 let userId = appState.authService.currentUser?.uid ?? ""
                 appState.firestoreService.listenToBookingsForUser(userId) { bookings in
@@ -410,6 +420,13 @@ struct HomeView: View {
                                     color: CLTheme.warningOrange
                                 )
                             }
+                            monitoringTile(
+                                title: "Respiratory",
+                                value: "\(metrics.respiratory)",
+                                unit: "RPM",
+                                icon: "wind",
+                                color: CLTheme.tealAccent
+                            )
                         }
                     }
                     .padding(.horizontal, CLTheme.spacingMD)
@@ -444,7 +461,7 @@ struct HomeView: View {
                     Text("Realtime Monitoring")
                         .font(CLTheme.headlineFont)
                         .foregroundStyle(.white)
-                    Text("Updated every second")
+                    Text(appState.healthKitService.isAuthorized ? "Synced from Apple Health" : "Updated every second")
                         .font(CLTheme.captionFont)
                         .foregroundStyle(.white.opacity(0.82))
                 }
@@ -520,9 +537,21 @@ struct HomeView: View {
         var oxygen: Int
         var progress: Int
         var stress: String
+        var respiratory: Int
     }
 
     private func monitoringMetrics(now: Date) -> MonitoringMetrics {
+        if appState.healthKitService.isAuthorized,
+           UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") {
+            let hk = appState.healthKitService.metrics
+            return MonitoringMetrics(
+                heartRate: hk.heartRateBPM ?? 0,
+                oxygen: hk.oxygenPercent ?? 0,
+                progress: min(100, max(0, hk.heartRateBPM ?? 0)),
+                stress: derivedStressLabel(heartRate: hk.heartRateBPM),
+                respiratory: hk.respiratoryRate ?? 0
+            )
+        }
         let second = Calendar.current.component(.second, from: now)
         let minute = Calendar.current.component(.minute, from: now)
         let heartRate = 68 + Int((sin(Double(second) / 60 * .pi * 2) * 7).rounded())
@@ -535,7 +564,21 @@ struct HomeView: View {
             default: return "Low"
             }
         }()
-        return MonitoringMetrics(heartRate: max(55, heartRate), oxygen: oxygen, progress: progress, stress: stress)
+        let respiratory = 14 + ((second / 8) % 4)
+        return MonitoringMetrics(
+            heartRate: max(55, heartRate),
+            oxygen: oxygen,
+            progress: progress,
+            stress: stress,
+            respiratory: respiratory
+        )
+    }
+
+    private func derivedStressLabel(heartRate: Int?) -> String {
+        guard let heartRate else { return "Unknown" }
+        if heartRate < 72 { return "Low" }
+        if heartRate < 90 { return "Moderate" }
+        return "Elevated"
     }
 
     private func statCard(icon: String, value: String, label: String, color: Color) -> some View {

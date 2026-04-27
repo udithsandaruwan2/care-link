@@ -6,6 +6,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("carelink.darkModeEnabled") private var darkModeEnabled = false
     @AppStorage("carelink.pushNotificationsEnabled") private var pushNotificationsEnabled = false
+    @AppStorage("carelink.healthKitSyncEnabled") private var healthKitSyncEnabled = false
     @State private var biometricEnabled = false
     @State private var isSyncingBiometricToggle = false
     @State private var didInitializeBiometricToggle = false
@@ -17,6 +18,7 @@ struct SettingsView: View {
     @State private var showClearDataConfirmation = false
     @State private var showSupportCenter = false
     @State private var showPrivacyPolicy = false
+    @State private var isConnectingHealth = false
 
     private let supportEmail = "support@carelink.app"
 
@@ -55,6 +57,34 @@ struct SettingsView: View {
                     Text("Accessibility")
                 } footer: {
                     Text("Dark appearance is stored on this device only.")
+                }
+
+                Section {
+                    settingsRow(icon: "applewatch", title: "Health Device Sync", color: CLTheme.tealAccent) {
+                        Text(healthConnectionLabel)
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(appState.healthKitService.isAuthorized ? CLTheme.successGreen : CLTheme.textSecondary)
+                    }
+
+                    Button {
+                        Task { await connectOrRefreshHealth() }
+                    } label: {
+                        HStack {
+                            Image(systemName: appState.healthKitService.isAuthorized ? "arrow.clockwise.circle.fill" : "link.circle.fill")
+                                .foregroundStyle(CLTheme.accentBlue)
+                            Text(appState.healthKitService.isAuthorized ? "Refresh Health Data" : "Connect Health Data")
+                                .foregroundStyle(CLTheme.textPrimary)
+                            Spacer()
+                            if isConnectingHealth || appState.healthKitService.isLoading {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isConnectingHealth || !appState.healthKitService.isAvailable)
+                } header: {
+                    Text("Devices")
+                } footer: {
+                    Text("CareLink reads health metrics through Apple Health. Your smartwatch app must sync to Apple Health for data to appear here.")
                 }
 
                 Section {
@@ -211,6 +241,12 @@ struct SettingsView: View {
             }
             .onAppear {
                 Task {
+                    await appState.healthKitService.refreshAuthorizationStatus()
+                    if healthKitSyncEnabled {
+                        await appState.healthKitService.refreshMetrics()
+                    }
+                }
+                Task {
                     let settings = await UNUserNotificationCenter.current().notificationSettings()
                     await MainActor.run {
                         appState.notificationService.isAuthorized = (settings.authorizationStatus == .authorized)
@@ -323,6 +359,36 @@ struct SettingsView: View {
 
             accessory()
         }
+    }
+
+    private var healthConnectionLabel: String {
+        guard appState.healthKitService.isAvailable else { return "Unavailable" }
+        return appState.healthKitService.isAuthorized ? "Connected" : "Not Connected"
+    }
+
+    @MainActor
+    private func connectOrRefreshHealth() async {
+        guard appState.healthKitService.isAvailable else {
+            biometricInfoMessage = "Health access is not available on this device."
+            showBiometricInfoAlert = true
+            healthKitSyncEnabled = false
+            return
+        }
+        isConnectingHealth = true
+        defer { isConnectingHealth = false }
+
+        if !appState.healthKitService.isAuthorized {
+            let granted = await appState.healthKitService.requestAuthorization()
+            healthKitSyncEnabled = granted
+            if !granted {
+                biometricInfoMessage = appState.healthKitService.lastErrorMessage ?? "Could not connect to Apple Health."
+                showBiometricInfoAlert = true
+                return
+            }
+        }
+
+        await appState.healthKitService.refreshMetrics()
+        healthKitSyncEnabled = appState.healthKitService.isAuthorized
     }
 }
 

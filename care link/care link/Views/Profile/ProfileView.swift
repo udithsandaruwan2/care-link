@@ -20,6 +20,9 @@ struct ProfileView: View {
                 VStack(spacing: CLTheme.spacingLG) {
                     profileHeader
                     quickStats
+                    if appState.currentUserRole == .user {
+                        healthSection
+                    }
                     accountSection
                     supportSection
                     signOutSection
@@ -80,6 +83,10 @@ struct ProfileView: View {
                     self.connections = (try? await appState.firestoreService.fetchConnectionsForUser(userId)) ?? []
                 }()
                 _ = await (bookingsTask, connectionsTask)
+                if UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") {
+                    await appState.healthKitService.refreshAuthorizationStatus()
+                    await appState.healthKitService.refreshMetrics()
+                }
             }
         }
     }
@@ -220,6 +227,72 @@ struct ProfileView: View {
             }
             .padding(.horizontal, CLTheme.spacingMD)
         }
+    }
+
+    private var healthSection: some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            HStack {
+                Text("Health Monitor")
+                    .font(CLTheme.title2Font)
+                    .foregroundStyle(CLTheme.textPrimary)
+                Spacer()
+                Text(appState.healthKitService.isAuthorized ? "Connected" : "Not Connected")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(appState.healthKitService.isAuthorized ? CLTheme.successGreen : CLTheme.textSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((appState.healthKitService.isAuthorized ? CLTheme.successGreen : CLTheme.textTertiary).opacity(0.12))
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, CLTheme.spacingMD)
+
+            HStack(spacing: CLTheme.spacingMD) {
+                healthTile(
+                    title: "Heart",
+                    value: appState.healthKitService.metrics.heartRateBPM.map(String.init) ?? "--",
+                    unit: "BPM",
+                    icon: "heart.fill",
+                    color: CLTheme.errorRed
+                )
+                healthTile(
+                    title: "SpO2",
+                    value: appState.healthKitService.metrics.oxygenPercent.map(String.init) ?? "--",
+                    unit: "%",
+                    icon: "lungs.fill",
+                    color: CLTheme.tealAccent
+                )
+                healthTile(
+                    title: "Breath",
+                    value: appState.healthKitService.metrics.respiratoryRate.map(String.init) ?? "--",
+                    unit: "RPM",
+                    icon: "wind",
+                    color: CLTheme.accentBlue
+                )
+            }
+            .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private func healthTile(title: String, value: String, unit: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+            Text(title)
+                .font(CLTheme.captionFont)
+                .foregroundStyle(CLTheme.textSecondary)
+            HStack(alignment: .lastTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                    .foregroundStyle(CLTheme.textPrimary)
+                Text(unit)
+                    .font(CLTheme.smallFont)
+                    .foregroundStyle(CLTheme.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(CLTheme.spacingSM)
+        .background(CLTheme.cardBackground)
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
     }
 
     private var signOutSection: some View {

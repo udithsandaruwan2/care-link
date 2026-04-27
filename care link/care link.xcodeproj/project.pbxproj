@@ -274,6 +274,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "care link/care_link.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -281,6 +282,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "CareLink can add your bookings to your calendar for easy scheduling.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your identity to access your private health records.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "CareLink reads heart rate, oxygen, and respiratory metrics from Apple Health to show your health monitor.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CareLink needs your location to find nearby caregivers.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -309,6 +311,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "care link/care_link.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -316,6 +319,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "CareLink can add your bookings to your calendar for easy scheduling.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Confirm your identity to access your private health records.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "CareLink reads heart rate, oxygen, and respiratory metrics from Apple Health to show your health monitor.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CareLink needs your location to find nearby caregivers.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

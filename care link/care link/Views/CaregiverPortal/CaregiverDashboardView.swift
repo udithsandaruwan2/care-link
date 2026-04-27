@@ -17,6 +17,8 @@ struct CaregiverDashboardView: View {
     @State private var showEditProfile = false
     @State private var featuredBooking: Booking?
     @State private var featuredPatientProfile: CLUser?
+    @State private var activePatientId: String?
+    @State private var isSavingActivePatient = false
 
     var body: some View {
         NavigationStack {
@@ -135,6 +137,23 @@ struct CaregiverDashboardView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: CLTheme.spacingMD) {
+                        Button {
+                            Task { await setActivePatientFromBooking(booking) }
+                        } label: {
+                            Label(
+                                activePatientId == booking.userId ? "Active patient" : "Set active",
+                                systemImage: activePatientId == booking.userId ? "checkmark.circle.fill" : "target"
+                            )
+                            .font(CLTheme.calloutFont)
+                            .frame(minWidth: 128)
+                            .padding(.vertical, 12)
+                            .foregroundStyle(activePatientId == booking.userId ? .white : CLTheme.primaryNavy)
+                            .background(activePatientId == booking.userId ? CLTheme.successGreen : CLTheme.lightBlue)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSavingActivePatient)
+
                         Button {
                             openChatForBookingPatient(booking)
                         } label: {
@@ -418,6 +437,18 @@ struct CaregiverDashboardView: View {
                         .background(CLTheme.tealAccent.opacity(0.12))
                         .clipShape(Circle())
                 }
+
+                Button {
+                    Task { await setActivePatient(patient) }
+                } label: {
+                    Image(systemName: activePatientId == patient.id ? "checkmark.seal.fill" : "scope")
+                        .font(.system(size: 14))
+                        .foregroundStyle(activePatientId == patient.id ? .white : CLTheme.successGreen)
+                        .frame(width: 36, height: 36)
+                        .background(activePatientId == patient.id ? CLTheme.successGreen : CLTheme.successGreen.opacity(0.12))
+                        .clipShape(Circle())
+                }
+                .disabled(isSavingActivePatient)
             }
         }
         .frame(width: 130)
@@ -639,18 +670,16 @@ struct CaregiverDashboardView: View {
 
     private func loadDashboardData() async {
         let caregiverId = appState.authService.currentUser?.uid ?? ""
-        async let appointmentsTask: () = viewModel.loadAppointments(
+        await viewModel.loadAppointments(
             caregiverId: caregiverId,
             firestoreService: appState.firestoreService,
             riskService: appState.coreMLBookingRiskService
         )
-        async let patientsTask: () = {
-            self.connectedPatients = (try? await appState.firestoreService.fetchConnectedPatients(caregiverId: caregiverId)) ?? []
-        }()
-        async let pendingTask: () = {
-            self.pendingConnections = (try? await appState.firestoreService.fetchPendingConnectionsForCaregiver(caregiverId)) ?? []
-        }()
-        _ = await (appointmentsTask, patientsTask, pendingTask)
+        connectedPatients = (try? await appState.firestoreService.fetchConnectedPatients(caregiverId: caregiverId)) ?? []
+        pendingConnections = (try? await appState.firestoreService.fetchPendingConnectionsForCaregiver(caregiverId)) ?? []
+        activePatientId = try? await appState.firestoreService
+            .fetchActivePatientForCaregiver(caregiverId: caregiverId)?
+            .patientId
         featuredBooking = viewModel.upcomingAppointments.min(by: { $0.date == $1.date ? $0.startTime < $1.startTime : $0.date < $1.date })
         if let fb = featuredBooking {
             featuredPatientProfile = try? await appState.firestoreService.fetchUser(fb.userId)
@@ -719,6 +748,48 @@ struct CaregiverDashboardView: View {
             )
             chatConversation = conv
             showChat = true
+        }
+    }
+
+    private func setActivePatient(_ patient: CLUser) async {
+        guard !isSavingActivePatient else { return }
+        let caregiverId = appState.authService.currentUser?.uid ?? ""
+        guard !caregiverId.isEmpty else { return }
+        isSavingActivePatient = true
+        defer { isSavingActivePatient = false }
+        do {
+            try await appState.firestoreService.setActivePatientForCaregiver(
+                caregiverId: caregiverId,
+                patientId: patient.id,
+                patientName: patient.fullName
+            )
+            activePatientId = patient.id
+        } catch {
+            print("Failed to set active patient: \(error)")
+        }
+    }
+
+    private func setActivePatientFromBooking(_ booking: Booking) async {
+        let name = booking.patientName.isEmpty ? "Patient" : booking.patientName
+        let profile = featuredPatientProfile?.id == booking.userId ? featuredPatientProfile : nil
+        if let profile {
+            await setActivePatient(profile)
+            return
+        }
+        guard !isSavingActivePatient else { return }
+        let caregiverId = appState.authService.currentUser?.uid ?? ""
+        guard !caregiverId.isEmpty else { return }
+        isSavingActivePatient = true
+        defer { isSavingActivePatient = false }
+        do {
+            try await appState.firestoreService.setActivePatientForCaregiver(
+                caregiverId: caregiverId,
+                patientId: booking.userId,
+                patientName: name
+            )
+            activePatientId = booking.userId
+        } catch {
+            print("Failed to set active patient from booking: \(error)")
         }
     }
 }

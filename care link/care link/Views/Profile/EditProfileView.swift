@@ -6,6 +6,7 @@ struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var fullName = ""
+    @State private var phoneNumber = ""
     @State private var address = ""
     @State private var emergencyContact = ""
     @State private var isSaving = false
@@ -19,7 +20,7 @@ struct EditProfileView: View {
                 VStack(spacing: CLTheme.spacingLG) {
                     avatarSection
                     formSection
-                    phoneSection
+                    accountSection
                 }
                 .padding(.bottom, CLTheme.spacingXL)
             }
@@ -99,6 +100,14 @@ struct EditProfileView: View {
             }
 
             VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
+                Text("PHONE NUMBER")
+                    .font(CLTheme.smallFont)
+                    .foregroundStyle(CLTheme.textTertiary)
+                    .tracking(1)
+                CLTextField(placeholder: "Your mobile number", text: $phoneNumber, icon: "phone.fill", keyboardType: .phonePad)
+            }
+
+            VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
                 Text("ADDRESS")
                     .font(CLTheme.smallFont)
                     .foregroundStyle(CLTheme.textTertiary)
@@ -123,30 +132,36 @@ struct EditProfileView: View {
 
     // MARK: - Email (read only)
 
-    private var phoneSection: some View {
-        VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
-            Text("EMAIL")
-                .font(CLTheme.smallFont)
-                .foregroundStyle(CLTheme.textTertiary)
-                .tracking(1)
-
-            HStack(spacing: CLTheme.spacingSM) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(CLTheme.tealAccent)
-                    .frame(width: 24)
-                Text(appState.authService.userProfile?.email ?? appState.authService.currentUser?.email ?? "—")
-                    .font(CLTheme.bodyFont)
-                    .foregroundStyle(CLTheme.textPrimary)
-                Spacer()
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 12))
+    private var accountSection: some View {
+        VStack(spacing: CLTheme.spacingMD) {
+            VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
+                Text("EMAIL")
+                    .font(CLTheme.smallFont)
                     .foregroundStyle(CLTheme.textTertiary)
+                    .tracking(1)
+
+                HStack(spacing: CLTheme.spacingSM) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(CLTheme.tealAccent)
+                        .frame(width: 24)
+                    Text(appState.authService.userProfile?.email ?? appState.authService.currentUser?.email ?? "—")
+                        .font(CLTheme.bodyFont)
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Spacer()
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(CLTheme.textTertiary)
+                }
+                .padding(.horizontal, CLTheme.spacingMD)
+                .frame(height: 54)
+                .background(CLTheme.backgroundSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
             }
-            .padding(.horizontal, CLTheme.spacingMD)
-            .frame(height: 54)
-            .background(CLTheme.backgroundSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
+
+            Text("Use your own number and emergency contact so caregivers can reach the right person quickly.")
+                .font(CLTheme.captionFont)
+                .foregroundStyle(CLTheme.textSecondary)
         }
         .padding(.horizontal, CLTheme.spacingMD)
     }
@@ -176,6 +191,7 @@ struct EditProfileView: View {
     private func loadProfile() {
         guard let profile = appState.authService.userProfile else { return }
         fullName = profile.fullName
+        phoneNumber = profile.phoneNumber
         address = profile.address
         emergencyContact = profile.emergencyContact
     }
@@ -186,13 +202,26 @@ struct EditProfileView: View {
             showError = true
             return
         }
+        let cleanPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEmergency = emergencyContact.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanPhone.filter(\.isNumber).count >= 7 else {
+            errorMessage = "Please enter a valid phone number."
+            showError = true
+            return
+        }
+        if !cleanEmergency.isEmpty, cleanEmergency.filter(\.isNumber).count < 7 {
+            errorMessage = "Emergency contact number looks incomplete."
+            showError = true
+            return
+        }
 
         isSaving = true
         Task {
             guard var profile = appState.authService.userProfile else { return }
             profile.fullName = fullName.trimmingCharacters(in: .whitespaces)
+            profile.phoneNumber = cleanPhone
             profile.address = address.trimmingCharacters(in: .whitespaces)
-            profile.emergencyContact = emergencyContact.trimmingCharacters(in: .whitespaces)
+            profile.emergencyContact = cleanEmergency
 
             do {
                 try await appState.authService.updateUserProfile(profile)

@@ -27,6 +27,7 @@ final class AppState {
     let chatService = ChatService()
     let biometricService = BiometricService()
     let notificationService = NotificationService()
+    let healthKitService = HealthKitService()
     let locationService = LocationService()
     let eventKitService = EventKitService()
     let recommendationService = RecommendationService()
@@ -50,6 +51,12 @@ final class AppState {
                         }
                         startChatListener()
                         startNotificationsListener()
+                        if UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") {
+                            Task {
+                                await healthKitService.refreshAuthorizationStatus()
+                                await healthKitService.refreshMetrics()
+                            }
+                        }
                     } else {
                         needsProfileSetup = true
                     }

@@ -8,6 +8,8 @@
 	<string>CareLink adds your bookings to Calendar with reminders so you do not miss visits.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CareLink uses your location to show nearby caregivers and center the map around you.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>CareLink reads heart rate, oxygen, and respiratory metrics from Apple Health to show your live health monitor.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
