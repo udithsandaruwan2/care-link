@@ -48,7 +48,9 @@ final class BookingViewModel {
         caregiver: Caregiver,
         userId: String,
         patientName: String,
-        patientAddress: String
+        patientAddress: String,
+        careRecipientId: String?,
+        careRecipientRelation: String?
     ) -> Booking {
         let bookingId = "bk_\(UUID().uuidString.prefix(8).lowercased())"
         let addr = patientAddress.trimmingCharacters(in: .whitespaces)
@@ -56,6 +58,8 @@ final class BookingViewModel {
             id: bookingId,
             userId: userId,
             patientName: patientName,
+            careRecipientId: careRecipientId,
+            careRecipientRelation: careRecipientRelation,
             caregiverId: caregiver.id,
             caregiverName: caregiver.name,
             caregiverSpecialty: caregiver.specialty,
@@ -79,6 +83,8 @@ final class BookingViewModel {
         userId: String,
         patientName: String,
         patientAddress: String,
+        careRecipientId: String?,
+        careRecipientRelation: String?,
         userHistory: [Booking],
         riskService: CoreMLBookingRiskService
     ) {
@@ -86,7 +92,9 @@ final class BookingViewModel {
             caregiver: caregiver,
             userId: userId,
             patientName: patientName,
-            patientAddress: patientAddress
+            patientAddress: patientAddress,
+            careRecipientId: careRecipientId,
+            careRecipientRelation: careRecipientRelation
         )
         riskAssessment = riskService.assessRisk(booking: booking, userHistory: userHistory)
     }
@@ -96,6 +104,8 @@ final class BookingViewModel {
         userId: String,
         patientName: String,
         patientAddress: String,
+        careRecipientId: String?,
+        careRecipientRelation: String?,
         firestoreService: FirestoreService,
         chatService: ChatService
     ) async -> Bool {
@@ -113,7 +123,9 @@ final class BookingViewModel {
             caregiver: caregiver,
             userId: userId,
             patientName: patientName,
-            patientAddress: patientAddress
+            patientAddress: patientAddress,
+            careRecipientId: careRecipientId,
+            careRecipientRelation: careRecipientRelation
         )
 
         do {

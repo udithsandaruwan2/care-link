@@ -3,6 +3,8 @@ import CoreData
 
 final class PersistenceController: @unchecked Sendable {
     static let shared = PersistenceController()
+    private let userProfileCacheKey = "cache.userProfile"
+    private let familyMembersCacheKey = "cache.familyMembers"
 
     let container: NSPersistentContainer
 
@@ -117,6 +119,33 @@ final class PersistenceController: @unchecked Sendable {
         let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "UserPreference")
         fetchRequest.predicate = NSPredicate(format: "key == %@", key)
         return (try? container.viewContext.fetch(fetchRequest).first)?.value(forKey: "value") as? String
+    }
+
+    // MARK: - Cached User Data (Offline)
+
+    func cacheUserProfile(_ profile: CLUser) {
+        guard let data = try? JSONEncoder().encode(profile),
+              let json = String(data: data, encoding: .utf8) else { return }
+        savePreference(key: userProfileCacheKey, value: json)
+    }
+
+    func loadCachedUserProfile() -> CLUser? {
+        guard let json = loadPreference(key: userProfileCacheKey),
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(CLUser.self, from: data)
+    }
+
+    func cacheFamilyMembers(_ members: [FamilyMember]) {
+        guard let data = try? JSONEncoder().encode(members),
+              let json = String(data: data, encoding: .utf8) else { return }
+        savePreference(key: familyMembersCacheKey, value: json)
+    }
+
+    func loadCachedFamilyMembers() -> [FamilyMember] {
+        guard let json = loadPreference(key: familyMembersCacheKey),
+              let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([FamilyMember].self, from: data) else { return [] }
+        return decoded
     }
 
     // MARK: - Model Definition

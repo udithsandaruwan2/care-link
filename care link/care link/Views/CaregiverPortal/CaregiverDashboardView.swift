@@ -607,6 +607,65 @@ struct CaregiverDashboardView: View {
 
                 if booking.status == .confirmed || booking.status == .inProgress {
                     let caregiverUid = appState.authService.currentUser?.uid ?? ""
+                    if booking.cancellationRequestedByUid == nil {
+                        Button {
+                            Task {
+                                try? await appState.firestoreService.requestBookingCancellation(
+                                    bookingId: booking.id,
+                                    requesterUid: caregiverUid,
+                                    requesterRole: .caregiver
+                                )
+                                await loadDashboardData()
+                            }
+                        } label: {
+                            Text("Request cancellation")
+                                .font(CLTheme.calloutFont)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(CLTheme.warningOrange)
+                                .background(CLTheme.warningOrange.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    } else if booking.cancellationRequestedByUid != caregiverUid {
+                        HStack(spacing: CLTheme.spacingMD) {
+                            Button {
+                                Task {
+                                    try? await appState.firestoreService.clearBookingCancellationRequest(bookingId: booking.id)
+                                    await loadDashboardData()
+                                }
+                            } label: {
+                                Text("Keep booking")
+                                    .font(CLTheme.calloutFont)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .foregroundStyle(CLTheme.textSecondary)
+                                    .background(CLTheme.backgroundSecondary)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                Task {
+                                    _ = try? await appState.firestoreService.applyBookingTransition(
+                                        bookingId: booking.id,
+                                        to: .cancelled,
+                                        actor: .caregiver,
+                                        callerUid: caregiverUid
+                                    )
+                                    await loadDashboardData()
+                                }
+                            } label: {
+                                Text("Confirm cancel")
+                                    .font(CLTheme.calloutFont)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .foregroundStyle(.white)
+                                    .background(CLTheme.errorRed)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                     if booking.status == .confirmed {
                         HStack(spacing: CLTheme.spacingMD) {
                             Button {

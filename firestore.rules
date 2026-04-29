@@ -49,8 +49,8 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid;
 
       allow update: if signedIn() && (
-        (resource.data.userId == request.auth.uid && onlyKeysChanged(["status"])) ||
-        (resource.data.caregiverId == request.auth.uid && onlyKeysChanged(["status"]))
+        (resource.data.userId == request.auth.uid && onlyKeysChanged(["status", "cancellationRequestedByUid", "cancellationRequestedByRole", "cancellationRequestedAt"])) ||
+        (resource.data.caregiverId == request.auth.uid && onlyKeysChanged(["status", "cancellationRequestedByUid", "cancellationRequestedByRole", "cancellationRequestedAt"]))
       );
 
       allow delete: if false;

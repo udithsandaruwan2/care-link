@@ -6,6 +6,7 @@ struct FamilyMembersView: View {
     @State private var members: [FamilyMember] = []
     @State private var showAddMember = false
     @State private var isLoading = false
+    @State private var showInternetAlert = false
 
     var body: some View {
         ScrollView {
@@ -44,11 +45,17 @@ struct FamilyMembersView: View {
         .sheet(isPresented: $showAddMember) {
             AddFamilyMemberView { newMember in
                 members.insert(newMember, at: 0)
+                PersistenceController.shared.cacheFamilyMembers(members)
             }
             .environment(appState)
         }
         .task {
             await loadMembers()
+        }
+        .alert("Internet Required", isPresented: $showInternetAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please turn on internet to add or sync family members.")
         }
     }
 
@@ -66,7 +73,11 @@ struct FamilyMembersView: View {
                     .font(CLTheme.calloutFont)
                     .foregroundStyle(CLTheme.textSecondary)
                 CLButton(title: "Add Family Member", icon: "person.badge.plus") {
-                    showAddMember = true
+                    if appState.networkMonitor.isConnected {
+                        showAddMember = true
+                    } else {
+                        showInternetAlert = true
+                    }
                 }
             }
         }
@@ -85,7 +96,11 @@ struct FamilyMembersView: View {
                 .foregroundStyle(CLTheme.textSecondary)
                 .multilineTextAlignment(.center)
             CLButton(title: "Add Member", style: .outline) {
-                showAddMember = true
+                if appState.networkMonitor.isConnected {
+                    showAddMember = true
+                } else {
+                    showInternetAlert = true
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -151,7 +166,13 @@ struct FamilyMembersView: View {
         guard !userId.isEmpty else { return }
         isLoading = true
         defer { isLoading = false }
-        members = (try? await appState.firestoreService.fetchFamilyMembers(for: userId)) ?? []
+        if appState.networkMonitor.isConnected {
+            let remote = (try? await appState.firestoreService.fetchFamilyMembers(for: userId)) ?? []
+            members = remote
+            PersistenceController.shared.cacheFamilyMembers(remote)
+        } else {
+            members = PersistenceController.shared.loadCachedFamilyMembers()
+        }
     }
 }
 

@@ -136,12 +136,12 @@ struct MyCareHubView: View {
                     Button {
                         Task {
                             do {
-                                let updated = try await appState.firestoreService.applyBookingTransition(
+                                try await appState.firestoreService.requestBookingCancellation(
                                     bookingId: booking.id,
-                                    to: .cancelled,
-                                    actor: .patient,
-                                    callerUid: patientUid
+                                    requesterUid: patientUid,
+                                    requesterRole: .patient
                                 )
+                                let updated = try await appState.firestoreService.fetchBooking(bookingId: booking.id) ?? booking
                                 if let index = bookings.firstIndex(where: { $0.id == booking.id }) {
                                     bookings[index] = updated
                                 }
@@ -150,7 +150,7 @@ struct MyCareHubView: View {
                             }
                         }
                     } label: {
-                        Text("Cancel request")
+                        Text(booking.cancellationRequestedByUid == patientUid ? "Cancellation pending" : "Request cancellation")
                             .font(CLTheme.calloutFont)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -158,6 +158,7 @@ struct MyCareHubView: View {
                             .background(CLTheme.errorRed.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM))
                     }
+                    .disabled(booking.cancellationRequestedByUid == patientUid)
                 }
             }
         }

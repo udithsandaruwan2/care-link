@@ -5,6 +5,9 @@ struct Booking: Identifiable, Codable, Sendable {
     var userId: String
     /// Display name of the patient (for caregiver-facing UI).
     var patientName: String
+    /// If set, identifies family member receiving care; nil means account owner.
+    var careRecipientId: String?
+    var careRecipientRelation: String?
     var caregiverId: String
     var caregiverName: String
     var caregiverSpecialty: String
@@ -20,6 +23,10 @@ struct Booking: Identifiable, Codable, Sendable {
     var address: String
     var paymentMethod: PaymentMethod
     var createdAt: Date
+    /// Two-step cancel flow metadata.
+    var cancellationRequestedByUid: String?
+    var cancellationRequestedByRole: String?
+    var cancellationRequestedAt: Date?
 
     enum BookingStatus: String, Codable, Sendable, CaseIterable {
         /// User submitted; caregiver must accept in chat or dashboard.
@@ -71,10 +78,12 @@ struct Booking: Identifiable, Codable, Sendable {
         }
     }
 
-    init(id: String, userId: String, patientName: String = "", caregiverId: String, caregiverName: String, caregiverSpecialty: String, caregiverImageURL: String, caregiverRating: Double, date: Date, startTime: Date, endTime: Date, duration: Double, totalCost: Double, status: BookingStatus, location: String, address: String, paymentMethod: PaymentMethod, createdAt: Date) {
+    init(id: String, userId: String, patientName: String = "", careRecipientId: String? = nil, careRecipientRelation: String? = nil, caregiverId: String, caregiverName: String, caregiverSpecialty: String, caregiverImageURL: String, caregiverRating: Double, date: Date, startTime: Date, endTime: Date, duration: Double, totalCost: Double, status: BookingStatus, location: String, address: String, paymentMethod: PaymentMethod, createdAt: Date, cancellationRequestedByUid: String? = nil, cancellationRequestedByRole: String? = nil, cancellationRequestedAt: Date? = nil) {
         self.id = id
         self.userId = userId
         self.patientName = patientName
+        self.careRecipientId = careRecipientId
+        self.careRecipientRelation = careRecipientRelation
         self.caregiverId = caregiverId
         self.caregiverName = caregiverName
         self.caregiverSpecialty = caregiverSpecialty
@@ -90,6 +99,9 @@ struct Booking: Identifiable, Codable, Sendable {
         self.address = address
         self.paymentMethod = paymentMethod
         self.createdAt = createdAt
+        self.cancellationRequestedByUid = cancellationRequestedByUid
+        self.cancellationRequestedByRole = cancellationRequestedByRole
+        self.cancellationRequestedAt = cancellationRequestedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -97,6 +109,8 @@ struct Booking: Identifiable, Codable, Sendable {
         id = try container.decode(String.self, forKey: .id)
         userId = try container.decode(String.self, forKey: .userId)
         patientName = try container.decodeIfPresent(String.self, forKey: .patientName) ?? ""
+        careRecipientId = try container.decodeIfPresent(String.self, forKey: .careRecipientId)
+        careRecipientRelation = try container.decodeIfPresent(String.self, forKey: .careRecipientRelation)
         caregiverId = try container.decode(String.self, forKey: .caregiverId)
         caregiverName = try container.decode(String.self, forKey: .caregiverName)
         caregiverSpecialty = try container.decode(String.self, forKey: .caregiverSpecialty)
@@ -112,5 +126,8 @@ struct Booking: Identifiable, Codable, Sendable {
         address = try container.decodeIfPresent(String.self, forKey: .address) ?? ""
         paymentMethod = try container.decodeIfPresent(PaymentMethod.self, forKey: .paymentMethod) ?? .cash
         createdAt = try container.decode(Date.self, forKey: .createdAt)
+        cancellationRequestedByUid = try container.decodeIfPresent(String.self, forKey: .cancellationRequestedByUid)
+        cancellationRequestedByRole = try container.decodeIfPresent(String.self, forKey: .cancellationRequestedByRole)
+        cancellationRequestedAt = try container.decodeIfPresent(Date.self, forKey: .cancellationRequestedAt)
     }
 }

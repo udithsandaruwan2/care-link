@@ -1,5 +1,6 @@
 import Foundation
 import FirebaseFirestore
+import FirebaseAuth
 
 struct CaregiverActivePatientSelection: Sendable {
     let patientId: String
@@ -211,6 +212,32 @@ final class FirestoreService {
         ])
     }
 
+    func requestBookingCancellation(
+        bookingId: String,
+        requesterUid: String,
+        requesterRole: BookingStateMachine.Actor
+    ) async throws {
+        guard let booking = try await fetchBooking(bookingId: bookingId) else { return }
+        guard BookingStateMachine.callerMatches(actor: requesterRole, booking: booking, callerUid: requesterUid) else {
+            throw BookingStateMachine.TransitionError.forbidden
+        }
+        guard BookingStateMachine.patientMayRequestCancel(status: booking.status) else { return }
+
+        try await db.collection("bookings").document(bookingId).updateData([
+            "cancellationRequestedByUid": requesterUid,
+            "cancellationRequestedByRole": requesterRole == .patient ? "patient" : "caregiver",
+            "cancellationRequestedAt": Timestamp(date: Date())
+        ])
+    }
+
+    func clearBookingCancellationRequest(bookingId: String) async throws {
+        try await db.collection("bookings").document(bookingId).updateData([
+            "cancellationRequestedByUid": FieldValue.delete(),
+            "cancellationRequestedByRole": FieldValue.delete(),
+            "cancellationRequestedAt": FieldValue.delete()
+        ])
+    }
+
     /// Validates domain rules, updates status, and keeps `connections` aligned with booking outcomes.
     func applyBookingTransition(
         bookingId: String,
@@ -229,6 +256,9 @@ final class FirestoreService {
         }
 
         try await updateBookingStatus(bookingId: bookingId, status: newStatus)
+        if newStatus == .cancelled {
+            try? await clearBookingCancellationRequest(bookingId: bookingId)
+        }
 
         var updated = booking
         updated.status = newStatus
@@ -488,17 +518,36 @@ final class FirestoreService {
     // MARK: - Family Members
 
     func addFamilyMember(_ member: FamilyMember) async throws {
-        try await encodeAndSet(member, at: db.collection("familyMembers").document(member.id))
+        let currentUid = Auth.auth().currentUser?.uid ?? ""
+        guard !currentUid.isEmpty else {
+            throw NSError(domain: "FirestoreService", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Your session expired. Please sign in again."
+            ])
+        }
+
+        // Enforce owner id from the authenticated user to satisfy Firestore rules.
+        var normalized = member
+        normalized.ownerUserId = currentUid
+        do {
+            try await encodeAndSet(normalized, at: db.collection("familyMembers").document(normalized.id))
+        } catch {
+            // Fallback path for projects where top-level familyMembers rules are not yet deployed.
+            try await appendFamilyMemberToUserDocument(normalized, userId: currentUid)
+        }
     }
 
     func fetchFamilyMembers(for ownerUserId: String) async throws -> [FamilyMember] {
-        let snapshot = try await db.collection("familyMembers")
-            .whereField("ownerUserId", isEqualTo: ownerUserId)
-            .order(by: "createdAt", descending: true)
-            .getDocuments()
+        do {
+            let snapshot = try await db.collection("familyMembers")
+                .whereField("ownerUserId", isEqualTo: ownerUserId)
+                .order(by: "createdAt", descending: true)
+                .getDocuments()
 
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: FamilyMember.self)
+            return snapshot.documents.compactMap { doc in
+                try? doc.data(as: FamilyMember.self)
+            }
+        } catch {
+            return try await fetchFamilyMembersFromUserDocument(userId: ownerUserId)
         }
     }
 
@@ -508,6 +557,47 @@ final class FirestoreService {
 
     func deleteFamilyMember(memberId: String) async throws {
         try await db.collection("familyMembers").document(memberId).delete()
+    }
+
+    private func appendFamilyMemberToUserDocument(_ member: FamilyMember, userId: String) async throws {
+        let payload: [String: Any] = [
+            "id": member.id,
+            "ownerUserId": member.ownerUserId,
+            "fullName": member.fullName,
+            "relation": member.relation,
+            "dateOfBirth": Timestamp(date: member.dateOfBirth),
+            "healthNotes": member.healthNotes,
+            "photoURL": member.photoURL,
+            "createdAt": Timestamp(date: member.createdAt)
+        ]
+        try await db.collection("users").document(userId).setData([
+            "familyMembers": FieldValue.arrayUnion([payload])
+        ], merge: true)
+    }
+
+    private func fetchFamilyMembersFromUserDocument(userId: String) async throws -> [FamilyMember] {
+        let snapshot = try await db.collection("users").document(userId).getDocument()
+        guard let raw = snapshot.data()?["familyMembers"] as? [[String: Any]] else { return [] }
+        return raw.compactMap { item in
+            guard let id = item["id"] as? String else { return nil }
+            let fullName = item["fullName"] as? String ?? ""
+            let relation = item["relation"] as? String ?? "Other"
+            let dob = (item["dateOfBirth"] as? Timestamp)?.dateValue() ?? Date()
+            let notes = item["healthNotes"] as? String ?? ""
+            let photoURL = item["photoURL"] as? String ?? ""
+            let created = (item["createdAt"] as? Timestamp)?.dateValue() ?? Date()
+            return FamilyMember(
+                id: id,
+                ownerUserId: userId,
+                fullName: fullName,
+                relation: relation,
+                dateOfBirth: dob,
+                healthNotes: notes,
+                photoURL: photoURL,
+                createdAt: created
+            )
+        }
+        .sorted { $0.createdAt > $1.createdAt }
     }
 
     // MARK: - Users

@@ -28,6 +28,7 @@ final class AppState {
     let biometricService = BiometricService()
     let notificationService = NotificationService()
     let healthKitService = HealthKitService()
+    let networkMonitor = NetworkMonitorService()
     let locationService = LocationService()
     let eventKitService = EventKitService()
     let recommendationService = RecommendationService()

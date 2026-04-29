@@ -8,6 +8,9 @@ struct BookingDetailsView: View {
     @State private var viewModel = BookingViewModel()
     @State private var showConfirmation = false
     @State private var bookingHistory: [Booking] = []
+    @State private var familyMembers: [FamilyMember] = []
+    @State private var selectedRecipientId = "self"
+    @State private var showInternetAlert = false
 
     private var hasBlockingBooking: Bool {
         bookingHistory.contains(where: { $0.status.blocksNewBookingRequest })
@@ -21,6 +24,7 @@ struct BookingDetailsView: View {
                 caregiverCard
                 dateSection
                 timeSection
+                careRecipientSection
                 durationInfo
                 popularDurationsSection
                 paymentMethodSection
@@ -77,6 +81,11 @@ struct BookingDetailsView: View {
             Button("OK") {}
         } message: {
             Text(viewModel.errorMessage ?? "")
+        }
+        .alert("Internet Required", isPresented: $showInternetAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please turn on internet to continue this action.")
         }
     }
 
@@ -189,6 +198,15 @@ struct BookingDetailsView: View {
                     .font(CLTheme.calloutFont)
                     .foregroundStyle(CLTheme.accentBlue)
             }
+            if selectedRecipientId != "self", let relation = selectedFamilyMember?.relation {
+                Text("Care recipient: \(selectedRecipientName) (\(relation))")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+            } else {
+                Text("Care recipient: \(selectedRecipientName)")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+            }
             if let risk = viewModel.riskAssessment {
                 HStack(spacing: 8) {
                     Image(systemName: risk.level == .high ? "exclamationmark.triangle.fill" : "shield.lefthalf.filled")
@@ -208,6 +226,57 @@ struct BookingDetailsView: View {
         .background(CLTheme.lightBlue)
         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD))
         .padding(.horizontal, CLTheme.spacingMD)
+    }
+
+    private var careRecipientSection: some View {
+        VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+            Text("Who needs care?")
+                .font(CLTheme.title2Font)
+                .foregroundStyle(CLTheme.textPrimary)
+                .padding(.horizontal, CLTheme.spacingMD)
+
+            VStack(spacing: CLTheme.spacingSM) {
+                recipientRow(
+                    id: "self",
+                    title: appState.authService.userProfile?.fullName ?? "Me",
+                    subtitle: "Account holder (default)"
+                )
+                ForEach(familyMembers) { member in
+                    recipientRow(
+                        id: member.id,
+                        title: member.fullName,
+                        subtitle: member.relation
+                    )
+                }
+            }
+            .padding(.horizontal, CLTheme.spacingMD)
+        }
+    }
+
+    private func recipientRow(id: String, title: String, subtitle: String) -> some View {
+        let isSelected = selectedRecipientId == id
+        return Button {
+            selectedRecipientId = id
+            recomputeRisk()
+        } label: {
+            HStack(spacing: CLTheme.spacingMD) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? CLTheme.accentBlue : CLTheme.textTertiary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(CLTheme.bodyFont)
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Text(subtitle)
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(CLTheme.spacingMD)
+            .background(CLTheme.cardBackground)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
+        }
+        .buttonStyle(.plain)
     }
 
     private var popularDurationsSection: some View {
@@ -317,15 +386,21 @@ struct BookingDetailsView: View {
 
             CLButton(title: "Confirm Booking", icon: "arrow.right", isLoading: viewModel.isLoading) {
                 Task {
+                    guard appState.networkMonitor.isConnected else {
+                        showInternetAlert = true
+                        return
+                    }
                     let userId = appState.authService.currentUser?.uid ?? ""
                     guard !userId.isEmpty else { return }
-                    let patientName = appState.authService.userProfile?.fullName ?? "Patient"
+                    let patientName = selectedRecipientName
                     let patientAddress = appState.authService.userProfile?.address ?? ""
                     viewModel.updateRiskAssessment(
                         caregiver: caregiver,
                         userId: userId,
                         patientName: patientName,
                         patientAddress: patientAddress,
+                        careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
+                        careRecipientRelation: selectedFamilyMember?.relation,
                         userHistory: bookingHistory,
                         riskService: appState.coreMLBookingRiskService
                     )
@@ -334,6 +409,8 @@ struct BookingDetailsView: View {
                         userId: userId,
                         patientName: patientName,
                         patientAddress: patientAddress,
+                        careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
+                        careRecipientRelation: selectedFamilyMember?.relation,
                         firestoreService: appState.firestoreService,
                         chatService: appState.chatService
                     )
@@ -363,8 +440,10 @@ struct BookingDetailsView: View {
     private func loadRiskContext() async {
         let userId = appState.authService.currentUser?.uid ?? ""
         guard !userId.isEmpty else { return }
+        guard appState.networkMonitor.isConnected else { return }
         await viewModel.loadUserBookings(userId: userId, firestoreService: appState.firestoreService)
         bookingHistory = viewModel.userBookings
+        familyMembers = (try? await appState.firestoreService.fetchFamilyMembers(for: userId)) ?? []
         recomputeRisk()
     }
 
@@ -374,11 +453,24 @@ struct BookingDetailsView: View {
         viewModel.updateRiskAssessment(
             caregiver: caregiver,
             userId: userId,
-            patientName: appState.authService.userProfile?.fullName ?? "Patient",
+            patientName: selectedRecipientName,
             patientAddress: appState.authService.userProfile?.address ?? "",
+            careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
+            careRecipientRelation: selectedFamilyMember?.relation,
             userHistory: bookingHistory,
             riskService: appState.coreMLBookingRiskService
         )
+    }
+
+    private var selectedFamilyMember: FamilyMember? {
+        familyMembers.first(where: { $0.id == selectedRecipientId })
+    }
+
+    private var selectedRecipientName: String {
+        if selectedRecipientId == "self" {
+            return appState.authService.userProfile?.fullName ?? "Patient"
+        }
+        return selectedFamilyMember?.fullName ?? (appState.authService.userProfile?.fullName ?? "Patient")
     }
 
     private func riskColor(_ level: BookingRiskAssessment.Level) -> Color {

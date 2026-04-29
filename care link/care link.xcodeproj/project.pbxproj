@@ -16,10 +16,29 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3307E5032F9FA7010044A831 /* care link Watch App.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = "care link Watch App.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		335177EF2F84E9AD003A6435 /* care link.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "care link.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3307E50A2F9FA7010044A831 /* Exceptions for "care link Watch App" folder in "care link Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3307E5022F9FA7010044A831 /* care link Watch App */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		3307E5042F9FA7010044A831 /* care link Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3307E50A2F9FA7010044A831 /* Exceptions for "care link Watch App" folder in "care link Watch App" target */,
+			);
+			path = "care link Watch App";
+			sourceTree = "<group>";
+		};
 		335177F12F84E9AD003A6435 /* care link */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "care link";
@@ -28,6 +47,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3307E5002F9FA7010044A831 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		335177EC2F84E9AD003A6435 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -48,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				335177F12F84E9AD003A6435 /* care link */,
+				3307E5042F9FA7010044A831 /* care link Watch App */,
 				335177F02F84E9AD003A6435 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -56,6 +83,7 @@
 			isa = PBXGroup;
 			children = (
 				335177EF2F84E9AD003A6435 /* care link.app */,
+				3307E5032F9FA7010044A831 /* care link Watch App.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -63,6 +91,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3307E5022F9FA7010044A831 /* care link Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3307E50B2F9FA7010044A831 /* Build configuration list for PBXNativeTarget "care link Watch App" */;
+			buildPhases = (
+				3307E4FF2F9FA7010044A831 /* Sources */,
+				3307E5002F9FA7010044A831 /* Frameworks */,
+				3307E5012F9FA7010044A831 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3307E5042F9FA7010044A831 /* care link Watch App */,
+			);
+			name = "care link Watch App";
+			packageProductDependencies = (
+			);
+			productName = "care link Watch App";
+			productReference = 3307E5032F9FA7010044A831 /* care link Watch App.appex */;
+			productType = "com.apple.product-type.extensionkit-extension";
+		};
 		335177EE2F84E9AD003A6435 /* care link */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 335177FA2F84E9AF003A6435 /* Build configuration list for PBXNativeTarget "care link" */;
@@ -101,6 +151,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					3307E5022F9FA7010044A831 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					335177EE2F84E9AD003A6435 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -125,11 +178,19 @@
 			projectRoot = "";
 			targets = (
 				335177EE2F84E9AD003A6435 /* care link */,
+				3307E5022F9FA7010044A831 /* care link Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3307E5012F9FA7010044A831 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		335177ED2F84E9AD003A6435 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -140,6 +201,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3307E4FF2F9FA7010044A831 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		335177EB2F84E9AD003A6435 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -150,6 +218,66 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		3307E50C2F9FA7010044A831 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "care link Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "care link Watch App";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cobsccomp242p-27.care-link-Watch-App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		3307E50D2F9FA7010044A831 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "care link Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "care link Watch App";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cobsccomp242p-27.care-link-Watch-App";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
 		335177F82F84E9AF003A6435 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -346,6 +474,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3307E50B2F9FA7010044A831 /* Build configuration list for PBXNativeTarget "care link Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3307E50C2F9FA7010044A831 /* Debug */,
+				3307E50D2F9FA7010044A831 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		335177EA2F84E9AD003A6435 /* Build configuration list for PBXProject "care link" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

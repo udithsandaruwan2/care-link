@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 struct AddFamilyMemberView: View {
     @Environment(AppState.self) private var appState
@@ -111,6 +112,11 @@ struct AddFamilyMemberView: View {
             showError = true
             return
         }
+        guard appState.networkMonitor.isConnected else {
+            errorMessage = "Please turn on internet to save this family member."
+            showError = true
+            return
+        }
 
         isSaving = true
         let member = FamilyMember(
@@ -133,7 +139,13 @@ struct AddFamilyMemberView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    if let nsError = error as NSError?,
+                       nsError.domain == FirestoreErrorDomain,
+                       nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+                        errorMessage = "Permission denied while saving family member. Please sign out and sign in again. If it still fails, deploy the latest Firestore rules."
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
                     showError = true
                     isSaving = false
                 }

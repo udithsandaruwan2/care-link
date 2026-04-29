@@ -55,6 +55,8 @@ enum BookingStateMachine: Sendable {
                 return true
             case (.awaitingCaregiver, .cancelled), (.pending, .cancelled):
                 return true
+            case (.confirmed, .cancelled), (.inProgress, .cancelled):
+                return true
             case (.confirmed, .inProgress):
                 return true
             case (.confirmed, .completed), (.inProgress, .completed):

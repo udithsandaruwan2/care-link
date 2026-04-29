@@ -199,6 +199,12 @@ struct BookingConfirmationView: View {
     private var bookingSummaryRows: some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
             LabeledContent("Status", value: booking.status.rawValue)
+            LabeledContent(
+                "Care Recipient",
+                value: booking.careRecipientRelation == nil
+                    ? booking.patientName
+                    : "\(booking.patientName) (\(booking.careRecipientRelation ?? ""))"
+            )
             LabeledContent("Caregiver", value: "\(caregiver.name) · \(caregiver.specialty)")
             LabeledContent("When", value: "\(booking.date.formatted(date: .abbreviated, time: .omitted)), \(booking.startTime.formatted(date: .omitted, time: .shortened)) – \(booking.endTime.formatted(date: .omitted, time: .shortened))")
             LabeledContent("Duration", value: String(format: "%.1f hours", booking.duration))

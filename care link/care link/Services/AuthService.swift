@@ -12,6 +12,7 @@ final class AuthService {
     var errorMessage: String?
 
     private var db: Firestore { Firestore.firestore() }
+    private let persistence = PersistenceController.shared
 
     func checkCurrentUser() {
         currentUser = Auth.auth().currentUser
@@ -71,19 +72,22 @@ final class AuthService {
         let data = try Firestore.Encoder().encode(newUser)
         try await db.collection("users").document(user.uid).setData(data)
         userProfile = newUser
+        persistence.cacheUserProfile(newUser)
     }
 
     func fetchUserProfile(uid: String) async {
         do {
             let document = try await db.collection("users").document(uid).getDocument()
             if document.exists {
-                userProfile = try document.data(as: CLUser.self)
+                let decoded = try document.data(as: CLUser.self)
+                userProfile = decoded
+                persistence.cacheUserProfile(decoded)
             } else {
                 userProfile = nil
             }
         } catch {
             errorMessage = error.localizedDescription
-            userProfile = nil
+            userProfile = persistence.loadCachedUserProfile()
         }
     }
 
@@ -91,6 +95,7 @@ final class AuthService {
         let data = try Firestore.Encoder().encode(user)
         try await db.collection("users").document(user.id).setData(data, merge: true)
         userProfile = user
+        persistence.cacheUserProfile(user)
     }
 
     // MARK: - Password Reset

@@ -260,6 +260,7 @@ private struct BookingRequestChatCard: View {
     @State private var booking: Booking?
     @State private var isLoading = true
     @State private var isWorking = false
+    private var currentUserId: String { appState.authService.currentUser?.uid ?? "" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
@@ -290,6 +291,14 @@ private struct BookingRequestChatCard: View {
 
                 statusChip(for: b.status)
 
+                if let requester = b.cancellationRequestedByUid {
+                    Text(requester == currentUserId
+                         ? "Cancellation requested. Waiting for confirmation."
+                         : "Cancellation requested by \(b.cancellationRequestedByRole == "caregiver" ? "caregiver" : "patient").")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.warningOrange)
+                }
+
                 if showCaregiverActions && b.status.needsCaregiverAction {
                     HStack(spacing: CLTheme.spacingSM) {
                         Button {
@@ -315,6 +324,54 @@ private struct BookingRequestChatCard: View {
                                 .padding(.vertical, 12)
                                 .foregroundStyle(.white)
                                 .background(CLTheme.successGreen)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isWorking)
+                    }
+                }
+
+                if mayShowCancellationRequestButton(for: b) {
+                    Button {
+                        requestCancellation(booking: b)
+                    } label: {
+                        Text("Request cancellation")
+                            .font(CLTheme.calloutFont)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .foregroundStyle(CLTheme.warningOrange)
+                            .background(CLTheme.warningOrange.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isWorking)
+                }
+
+                if mayShowCancellationConfirmation(for: b) {
+                    HStack(spacing: CLTheme.spacingSM) {
+                        Button {
+                            keepBooking(booking: b)
+                        } label: {
+                            Text("Keep booking")
+                                .font(CLTheme.calloutFont)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(CLTheme.textSecondary)
+                                .background(CLTheme.backgroundSecondary)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isWorking)
+
+                        Button {
+                            confirmCancellation(booking: b)
+                        } label: {
+                            Text("Confirm cancel")
+                                .font(CLTheme.calloutFont)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(.white)
+                                .background(CLTheme.errorRed)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -394,6 +451,83 @@ private struct BookingRequestChatCard: View {
                     senderName: appState.authService.userProfile?.fullName ?? "Caregiver",
                     text: note
                 )
+            }
+            await MainActor.run { isWorking = false }
+        }
+    }
+
+    private func mayShowCancellationRequestButton(for booking: Booking) -> Bool {
+        guard booking.status == .awaitingCaregiver || booking.status == .pending || booking.status == .confirmed || booking.status == .inProgress else {
+            return false
+        }
+        return booking.cancellationRequestedByUid == nil
+    }
+
+    private func mayShowCancellationConfirmation(for booking: Booking) -> Bool {
+        guard let requester = booking.cancellationRequestedByUid else { return false }
+        return requester != currentUserId
+    }
+
+    private func requestCancellation(booking: Booking) {
+        let actor: BookingStateMachine.Actor = currentUserId == booking.userId ? .patient : .caregiver
+        isWorking = true
+        Task {
+            do {
+                try await appState.firestoreService.requestBookingCancellation(
+                    bookingId: booking.id,
+                    requesterUid: currentUserId,
+                    requesterRole: actor
+                )
+                let roleLabel = actor == .patient ? "Patient" : "Caregiver"
+                try? await appState.chatService.sendMessage(
+                    conversationId: conversation.id,
+                    senderId: currentUserId,
+                    senderName: appState.authService.userProfile?.fullName ?? roleLabel,
+                    text: "⚠️ Cancellation requested. Please confirm to release this booking."
+                )
+                self.booking = try? await appState.firestoreService.fetchBooking(bookingId: booking.id)
+            } catch {
+                print("request cancellation failed: \(error)")
+            }
+            await MainActor.run { isWorking = false }
+        }
+    }
+
+    private func keepBooking(booking: Booking) {
+        isWorking = true
+        Task {
+            try? await appState.firestoreService.clearBookingCancellationRequest(bookingId: booking.id)
+            try? await appState.chatService.sendMessage(
+                conversationId: conversation.id,
+                senderId: currentUserId,
+                senderName: appState.authService.userProfile?.fullName ?? "User",
+                text: "✅ Cancellation request declined. Booking remains active."
+            )
+            self.booking = try? await appState.firestoreService.fetchBooking(bookingId: booking.id)
+            await MainActor.run { isWorking = false }
+        }
+    }
+
+    private func confirmCancellation(booking: Booking) {
+        let actor: BookingStateMachine.Actor = currentUserId == booking.userId ? .patient : .caregiver
+        isWorking = true
+        Task {
+            do {
+                _ = try await appState.firestoreService.applyBookingTransition(
+                    bookingId: booking.id,
+                    to: .cancelled,
+                    actor: actor,
+                    callerUid: currentUserId
+                )
+                try? await appState.chatService.sendMessage(
+                    conversationId: conversation.id,
+                    senderId: currentUserId,
+                    senderName: appState.authService.userProfile?.fullName ?? "User",
+                    text: "🛑 Cancellation confirmed. Booking and link released."
+                )
+                self.booking = try? await appState.firestoreService.fetchBooking(bookingId: booking.id)
+            } catch {
+                print("confirm cancellation failed: \(error)")
             }
             await MainActor.run { isWorking = false }
         }

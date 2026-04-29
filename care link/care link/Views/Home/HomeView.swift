@@ -30,6 +30,9 @@ struct HomeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+                        if !appState.networkMonitor.isConnected {
+                            internetRequiredBanner
+                        }
                         greetingSection
                         yourCaregiverCard
                         if hasAssignedCaregiverDashboard {
@@ -83,7 +86,12 @@ struct HomeView: View {
                 }
             }
             .task {
-                await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
+                if appState.networkMonitor.isConnected {
+                    await viewModel.loadCaregivers(firestoreService: appState.firestoreService)
+                } else {
+                    viewModel.filteredCaregivers = []
+                    viewModel.caregivers = []
+                }
                 let history = await loadBookingHistory()
                 viewModel.updateRecommendations(
                     recommendationService: appState.coreMLRecommendationService,
@@ -146,6 +154,21 @@ struct HomeView: View {
     }
 
     // MARK: - Greeting
+
+    private var internetRequiredBanner: some View {
+        HStack(spacing: CLTheme.spacingSM) {
+            Image(systemName: "wifi.exclamationmark")
+                .foregroundStyle(CLTheme.warningOrange)
+            Text("Internet is off. Turn on internet for caregiver search, booking, and chat.")
+                .font(CLTheme.captionFont)
+                .foregroundStyle(CLTheme.textSecondary)
+            Spacer()
+        }
+        .padding(CLTheme.spacingMD)
+        .background(CLTheme.warningOrange.opacity(0.12))
+        .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
+        .padding(.horizontal, CLTheme.spacingMD)
+    }
 
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
@@ -294,7 +317,7 @@ struct HomeView: View {
 
                     if booking.status == .awaitingCaregiver || booking.status == .pending || booking.status == .confirmed {
                         CLButton(
-                            title: isCancellingRequest ? "Cancelling..." : "Cancel Request",
+                            title: isCancellingRequest ? "Sending..." : "Request Cancellation",
                             icon: "xmark.circle",
                             style: .outline,
                             isLoading: isCancellingRequest
@@ -925,12 +948,17 @@ struct HomeView: View {
         isCancellingRequest = true
         Task {
             do {
-                _ = try await appState.firestoreService.applyBookingTransition(
+                try await appState.firestoreService.requestBookingCancellation(
                     bookingId: bookingId,
-                    to: .cancelled,
-                    actor: .patient,
-                    callerUid: patientUid
+                    requesterUid: patientUid,
+                    requesterRole: .patient
                 )
+                if let booking = try? await appState.firestoreService.fetchBooking(bookingId: bookingId) {
+                    await MainActor.run {
+                        if activeBooking?.id == bookingId { activeBooking = booking }
+                        if pendingBooking?.id == bookingId { pendingBooking = booking }
+                    }
+                }
             } catch {
                 // Reuse global error surfaces elsewhere; UI is kept simple here.
             }

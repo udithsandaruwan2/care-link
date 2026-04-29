@@ -19,7 +19,7 @@ struct CaregiverHomeView: View {
         guard let patientId = activePatientSelection?.patientId else { return nil }
         return bookings.first {
             $0.userId == patientId && ($0.status == .inProgress || $0.status == .confirmed)
-        } ?? bookings.first { $0.userId == patientId }
+        }
     }
 
     private var pendingCount: Int {
@@ -31,8 +31,10 @@ struct CaregiverHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
                     greetingSection
-                    if let profile = activePatientProfile {
-                        activePatientCard(profile)
+                    if let profile = activePatientProfile, let booking = activePatientBooking {
+                        activePatientCard(profile, booking: booking)
+                    } else if let profile = activePatientProfile {
+                        selectedButNotActiveCard(profile)
                     } else {
                         noActivePatientCard
                     }
@@ -99,7 +101,7 @@ struct CaregiverHomeView: View {
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
-    private func activePatientCard(_ patient: CLUser) -> some View {
+    private func activePatientCard(_ patient: CLUser, booking: Booking) -> some View {
         CLCard {
             VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
                 HStack {
@@ -122,18 +124,16 @@ struct CaregiverHomeView: View {
                     .font(CLTheme.captionFont)
                     .foregroundStyle(CLTheme.textSecondary)
 
-                if let booking = activePatientBooking {
-                    Text("\(booking.date.formatted(date: .abbreviated, time: .omitted)) · \(booking.startTime.formatted(date: .omitted, time: .shortened))")
-                        .font(CLTheme.captionFont)
-                        .foregroundStyle(CLTheme.textSecondary)
-                    Text(booking.status.rawValue)
-                        .font(CLTheme.captionFont)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color(hex: booking.status.color))
-                        .clipShape(Capsule())
-                }
+                Text("\(booking.date.formatted(date: .abbreviated, time: .omitted)) · \(booking.startTime.formatted(date: .omitted, time: .shortened))")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+                Text(booking.status.rawValue)
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: booking.status.color))
+                    .clipShape(Capsule())
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: CLTheme.spacingSM) {
@@ -177,6 +177,20 @@ struct CaregiverHomeView: View {
                         .buttonStyle(.plain)
                     }
                 }
+            }
+        }
+        .padding(.horizontal, CLTheme.spacingMD)
+    }
+
+    private func selectedButNotActiveCard(_ patient: CLUser) -> some View {
+        CLCard {
+            VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
+                Text("No active session")
+                    .font(CLTheme.title2Font)
+                    .foregroundStyle(CLTheme.textPrimary)
+                Text("\(patient.fullName) is selected, but there is no confirmed or in-progress booking.")
+                    .font(CLTheme.bodyFont)
+                    .foregroundStyle(CLTheme.textSecondary)
             }
         }
         .padding(.horizontal, CLTheme.spacingMD)
