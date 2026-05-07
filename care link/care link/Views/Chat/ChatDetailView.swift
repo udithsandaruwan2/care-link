@@ -4,6 +4,7 @@ import FirebaseAuth
 struct ChatDetailView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let conversation: ChatConversation
 
     @State private var messageText = ""
@@ -152,11 +153,14 @@ struct ChatDetailView: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(CLTheme.textPrimary)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(CLTheme.backgroundSecondary)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "Back"))
+            .accessibilityHint(String(localized: "Closes this conversation"))
+            .accessibilityAddTraits(.isButton)
 
             Circle()
                 .fill(CLTheme.primaryNavy.opacity(0.12))
@@ -174,16 +178,21 @@ struct ChatDetailView: View {
                 Text(displaySubtitle)
                     .font(CLTheme.captionFont)
                     .foregroundStyle(CLTheme.textSecondary)
-            }
+                }
 
             Spacer()
 
-            Circle()
-                .fill(CLTheme.successGreen)
-                .frame(width: 8, height: 8)
-            Text("Online")
-                .font(CLTheme.captionFont)
-                .foregroundStyle(CLTheme.successGreen)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(CLTheme.successGreen)
+                    .frame(width: 8, height: 8)
+                    .accessibilityHidden(true)
+                Text("Online")
+                    .font(CLTheme.captionFont)
+                    .foregroundStyle(CLTheme.successGreen)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(String(localized: "Status: online"))
         }
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.vertical, CLTheme.spacingSM)
@@ -205,6 +214,7 @@ struct ChatDetailView: View {
                     Capsule()
                         .stroke(CLTheme.divider.opacity(0.55), lineWidth: 1)
                 }
+                .accessibilityLabel(String(localized: "Message text field"))
 
             Button {
                 sendMessage()
@@ -219,6 +229,9 @@ struct ChatDetailView: View {
             }
             .buttonStyle(.plain)
             .disabled(messageText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .accessibilityLabel(String(localized: "Send message"))
+            .accessibilityHint(String(localized: "Sends your message to the conversation"))
+            .accessibilityAddTraits(.isButton)
         }
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.vertical, CLTheme.spacingSM)
@@ -242,8 +255,12 @@ struct ChatDetailView: View {
 
     private func scrollToBottom() {
         if let last = appState.chatService.currentMessages.last {
-            withAnimation(.easeOut(duration: 0.2)) {
+            if reduceMotion {
                 scrollProxy?.scrollTo(last.id, anchor: .bottom)
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    scrollProxy?.scrollTo(last.id, anchor: .bottom)
+                }
             }
         }
     }
@@ -260,6 +277,7 @@ private struct BookingRequestChatCard: View {
     @State private var booking: Booking?
     @State private var isLoading = true
     @State private var isWorking = false
+    @State private var inlineActionError: String?
     private var currentUserId: String { appState.authService.currentUser?.uid ?? "" }
 
     var body: some View {
@@ -267,9 +285,11 @@ private struct BookingRequestChatCard: View {
             HStack {
                 Image(systemName: "calendar.badge.clock")
                     .foregroundStyle(CLTheme.tealAccent)
+                    .accessibilityHidden(true)
                 Text("Booking request")
                     .font(CLTheme.headlineFont)
                     .foregroundStyle(CLTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
             }
 
@@ -314,6 +334,10 @@ private struct BookingRequestChatCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isWorking)
+                        .accessibilityLabel(String(localized: "Decline booking"))
+                        .accessibilityHint(String(localized: "Rejects this booking request"))
+                        .careLinkAccessibilityValue(isWorking ? String(localized: "Processing") : nil)
+                        .accessibilityAddTraits(.isButton)
 
                         Button {
                             respond(accept: true)
@@ -328,6 +352,10 @@ private struct BookingRequestChatCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isWorking)
+                        .accessibilityLabel(String(localized: "Accept booking"))
+                        .accessibilityHint(String(localized: "Confirms this booking request"))
+                        .careLinkAccessibilityValue(isWorking ? String(localized: "Processing") : nil)
+                        .accessibilityAddTraits(.isButton)
                     }
                 }
 
@@ -345,6 +373,10 @@ private struct BookingRequestChatCard: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isWorking)
+                    .accessibilityLabel(String(localized: "Request cancellation"))
+                    .accessibilityHint(String(localized: "Asks the other party to confirm cancelling the booking"))
+                    .careLinkAccessibilityValue(isWorking ? String(localized: "Processing") : nil)
+                    .accessibilityAddTraits(.isButton)
                 }
 
                 if mayShowCancellationConfirmation(for: b) {
@@ -362,6 +394,10 @@ private struct BookingRequestChatCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isWorking)
+                        .accessibilityLabel(String(localized: "Keep booking"))
+                        .accessibilityHint(String(localized: "Dismisses the cancellation request"))
+                        .careLinkAccessibilityValue(isWorking ? String(localized: "Processing") : nil)
+                        .accessibilityAddTraits(.isButton)
 
                         Button {
                             confirmCancellation(booking: b)
@@ -376,6 +412,10 @@ private struct BookingRequestChatCard: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(isWorking)
+                        .accessibilityLabel(String(localized: "Confirm cancellation"))
+                        .accessibilityHint(String(localized: "Cancels the booking after both parties agreed"))
+                        .careLinkAccessibilityValue(isWorking ? String(localized: "Processing") : nil)
+                        .accessibilityAddTraits(.isButton)
                     }
                 }
             } else {
@@ -398,6 +438,14 @@ private struct BookingRequestChatCard: View {
         }
         .task(id: message.bookingId) {
             await loadBooking()
+        }
+        .alert("Booking action failed", isPresented: Binding(
+            get: { inlineActionError != nil },
+            set: { if !$0 { inlineActionError = nil } }
+        )) {
+            Button("OK", role: .cancel) { inlineActionError = nil }
+        } message: {
+            Text(inlineActionError ?? "")
         }
     }
 
@@ -451,6 +499,8 @@ private struct BookingRequestChatCard: View {
                     senderName: appState.authService.userProfile?.fullName ?? "Caregiver",
                     text: note
                 )
+            } catch {
+                await MainActor.run { inlineActionError = error.localizedDescription }
             }
             await MainActor.run { isWorking = false }
         }
@@ -487,7 +537,7 @@ private struct BookingRequestChatCard: View {
                 )
                 self.booking = try? await appState.firestoreService.fetchBooking(bookingId: booking.id)
             } catch {
-                print("request cancellation failed: \(error)")
+                await MainActor.run { inlineActionError = error.localizedDescription }
             }
             await MainActor.run { isWorking = false }
         }
@@ -527,7 +577,7 @@ private struct BookingRequestChatCard: View {
                 )
                 self.booking = try? await appState.firestoreService.fetchBooking(bookingId: booking.id)
             } catch {
-                print("confirm cancellation failed: \(error)")
+                await MainActor.run { inlineActionError = error.localizedDescription }
             }
             await MainActor.run { isWorking = false }
         }

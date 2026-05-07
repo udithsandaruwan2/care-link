@@ -3,6 +3,7 @@ import FirebaseAuth
 
 struct CaregiverDashboardView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel = CaregiverPortalViewModel()
     @State private var selectedSection = 0
 
@@ -19,6 +20,8 @@ struct CaregiverDashboardView: View {
     @State private var featuredPatientProfile: CLUser?
     @State private var activePatientId: String?
     @State private var isSavingActivePatient = false
+    @State private var dashboardActionError: String?
+    @State private var showPatientProfile = false
 
     var body: some View {
         NavigationStack {
@@ -59,12 +62,24 @@ struct CaregiverDashboardView: View {
                         .environment(appState)
                 }
             }
+            .navigationDestination(isPresented: $showPatientProfile) {
+                PatientProfileView(patient: featuredPatientProfile, booking: featuredBooking)
+                    .environment(appState)
+            }
             .sheet(isPresented: $showEditProfile) {
                 CaregiverProfileEditView()
                     .environment(appState)
             }
             .task {
                 await loadDashboardData()
+            }
+            .alert("Action failed", isPresented: Binding(
+                get: { dashboardActionError != nil },
+                set: { if !$0 { dashboardActionError = nil } }
+            )) {
+                Button("OK", role: .cancel) { dashboardActionError = nil }
+            } message: {
+                Text(dashboardActionError ?? "")
             }
         }
     }
@@ -89,6 +104,9 @@ struct CaregiverDashboardView: View {
                     .font(.system(size: 32))
                     .foregroundStyle(CLTheme.accentBlue)
             }
+            .accessibilityLabel(String(localized: "Edit caregiver profile"))
+            .accessibilityHint(String(localized: "Opens your public profile and availability"))
+            .careLinkMinimumTapTarget(44)
         }
         .padding(.horizontal, CLTheme.spacingMD)
     }
@@ -134,25 +152,28 @@ struct CaregiverDashboardView: View {
                             .foregroundStyle(CLTheme.textTertiary)
                     }
                 }
+                .accessibilityElement(children: .combine)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: CLTheme.spacingMD) {
                         Button {
                             Task { await setActivePatientFromBooking(booking) }
                         } label: {
+                            let activeIdForBooking = booking.careRecipientId ?? booking.userId
                             Label(
-                                activePatientId == booking.userId ? "Active patient" : "Set active",
-                                systemImage: activePatientId == booking.userId ? "checkmark.circle.fill" : "target"
+                                activePatientId == activeIdForBooking ? "Active patient" : "Set active",
+                                systemImage: activePatientId == activeIdForBooking ? "checkmark.circle.fill" : "target"
                             )
                             .font(CLTheme.calloutFont)
                             .frame(minWidth: 128)
                             .padding(.vertical, 12)
-                            .foregroundStyle(activePatientId == booking.userId ? .white : CLTheme.primaryNavy)
-                            .background(activePatientId == booking.userId ? CLTheme.successGreen : CLTheme.lightBlue)
+                            .foregroundStyle(activePatientId == activeIdForBooking ? .white : CLTheme.primaryNavy)
+                            .background(activePatientId == activeIdForBooking ? CLTheme.successGreen : CLTheme.lightBlue)
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         .disabled(isSavingActivePatient)
+                        .careLinkAccessibilityValue(isSavingActivePatient ? String(localized: "Saving") : nil)
 
                         Button {
                             openChatForBookingPatient(booking)
@@ -163,6 +184,18 @@ struct CaregiverDashboardView: View {
                                 .padding(.vertical, 12)
                                 .foregroundStyle(.white)
                                 .background(CLTheme.primaryNavy)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            showPatientProfile = true
+                        } label: {
+                            Label("Profile", systemImage: "person.crop.circle")
+                                .font(CLTheme.calloutFont)
+                                .frame(minWidth: 92)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(CLTheme.primaryNavy)
+                                .background(CLTheme.lightBlue)
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -500,7 +533,11 @@ struct CaregiverDashboardView: View {
 
     private func segmentButton(_ title: String, index: Int, count: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { selectedSection = index }
+            if reduceMotion {
+                selectedSection = index
+            } else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) { selectedSection = index }
+            }
         } label: {
             HStack(spacing: 4) {
                 Text(title)
@@ -522,6 +559,9 @@ struct CaregiverDashboardView: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(count > 0 ? String(format: String(localized: "%lld items"), locale: .current, count) : "")
+        .accessibilityAddTraits(selectedSection == index ? [.isSelected] : [])
     }
 
     private func appointmentCard(_ booking: Booking) -> some View {
@@ -590,6 +630,9 @@ struct CaregiverDashboardView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Decline booking"))
+                        .accessibilityHint(String(localized: "Rejects this patient's booking request"))
+                        .accessibilityAddTraits(.isButton)
                         Button {
                             Task { await viewModel.acceptBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
                         } label: {
@@ -602,6 +645,9 @@ struct CaregiverDashboardView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Accept booking"))
+                        .accessibilityHint(String(localized: "Confirms this booking request"))
+                        .accessibilityAddTraits(.isButton)
                     }
                 }
 
@@ -627,6 +673,8 @@ struct CaregiverDashboardView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Request cancellation"))
+                        .accessibilityHint(String(localized: "Asks the patient to confirm cancelling the booking"))
                     } else if booking.cancellationRequestedByUid != caregiverUid {
                         HStack(spacing: CLTheme.spacingMD) {
                             Button {
@@ -644,15 +692,23 @@ struct CaregiverDashboardView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(String(localized: "Keep booking"))
+                            .accessibilityHint(String(localized: "Dismisses the cancellation request"))
                             Button {
                                 Task {
-                                    _ = try? await appState.firestoreService.applyBookingTransition(
-                                        bookingId: booking.id,
-                                        to: .cancelled,
-                                        actor: .caregiver,
-                                        callerUid: caregiverUid
-                                    )
-                                    await loadDashboardData()
+                                    do {
+                                        _ = try await appState.firestoreService.applyBookingTransition(
+                                            bookingId: booking.id,
+                                            to: .cancelled,
+                                            actor: .caregiver,
+                                            callerUid: caregiverUid
+                                        )
+                                        await loadDashboardData()
+                                    } catch {
+                                        await MainActor.run {
+                                            dashboardActionError = error.localizedDescription
+                                        }
+                                    }
                                 }
                             } label: {
                                 Text("Confirm cancel")
@@ -664,6 +720,8 @@ struct CaregiverDashboardView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(String(localized: "Confirm cancellation"))
+                            .accessibilityHint(String(localized: "Cancels the booking after both parties agreed"))
                         }
                     }
                     if booking.status == .confirmed {
@@ -680,6 +738,8 @@ struct CaregiverDashboardView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(String(localized: "Start visit"))
+                            .accessibilityHint(String(localized: "Marks that you have started this appointment"))
                             Button {
                                 Task { await viewModel.completeBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
                             } label: {
@@ -692,6 +752,8 @@ struct CaregiverDashboardView: View {
                                     .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(String(localized: "Mark complete"))
+                            .accessibilityHint(String(localized: "Marks this visit as finished"))
                         }
                     } else if booking.status == .inProgress {
                         Button {
@@ -706,6 +768,8 @@ struct CaregiverDashboardView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Mark complete"))
+                        .accessibilityHint(String(localized: "Marks this visit as finished"))
                     }
                 }
             }
@@ -741,7 +805,7 @@ struct CaregiverDashboardView: View {
             .patientId
         featuredBooking = viewModel.upcomingAppointments.min(by: { $0.date == $1.date ? $0.startTime < $1.startTime : $0.date < $1.date })
         if let fb = featuredBooking {
-            featuredPatientProfile = try? await appState.firestoreService.fetchUser(fb.userId)
+            featuredPatientProfile = try? await appState.firestoreService.fetchUser(fb.careRecipientId ?? fb.userId)
         } else {
             featuredPatientProfile = nil
         }
@@ -830,7 +894,8 @@ struct CaregiverDashboardView: View {
 
     private func setActivePatientFromBooking(_ booking: Booking) async {
         let name = booking.patientName.isEmpty ? "Patient" : booking.patientName
-        let profile = featuredPatientProfile?.id == booking.userId ? featuredPatientProfile : nil
+        let activeIdForBooking = booking.careRecipientId ?? booking.userId
+        let profile = featuredPatientProfile?.id == activeIdForBooking ? featuredPatientProfile : nil
         if let profile {
             await setActivePatient(profile)
             return
@@ -843,10 +908,10 @@ struct CaregiverDashboardView: View {
         do {
             try await appState.firestoreService.setActivePatientForCaregiver(
                 caregiverId: caregiverId,
-                patientId: booking.userId,
+                patientId: activeIdForBooking,
                 patientName: name
             )
-            activePatientId = booking.userId
+            activePatientId = activeIdForBooking
         } catch {
             print("Failed to set active patient from booking: \(error)")
         }

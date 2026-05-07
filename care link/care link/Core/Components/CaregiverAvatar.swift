@@ -4,6 +4,8 @@ struct CaregiverAvatar: View {
     var size: CGFloat = 60
     var imageURL: String = ""
     var showVerified: Bool = false
+    /// Used for VoiceOver when the avatar represents a person.
+    var accessibilityName: String? = nil
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -33,6 +35,17 @@ struct CaregiverAvatar: View {
                     )
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(avatarAccessibilityLabel)
+        .accessibilityAddTraits(.isImage)
+    }
+
+    private var avatarAccessibilityLabel: String {
+        let base = accessibilityName ?? String(localized: "Caregiver profile photo")
+        if showVerified {
+            return base + ", " + String(localized: "Verified caregiver")
+        }
+        return base
     }
 }
 

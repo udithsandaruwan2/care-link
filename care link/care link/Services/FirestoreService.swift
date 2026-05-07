@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFunctions
 
 struct CaregiverActivePatientSelection: Sendable {
     let patientId: String
@@ -13,6 +14,17 @@ final class FirestoreService {
     private var db: Firestore { Firestore.firestore() }
     private var userBookingsListener: ListenerRegistration?
     private var userNotificationsListener: ListenerRegistration?
+    private func isFunctionUnavailableError(_ error: Error) -> Bool {
+        if error is BookingFunctionsError { return true }
+        let ns = error as NSError
+        let looksLikeNotFoundCode = ns.code == FunctionsErrorCode.notFound.rawValue || ns.code == 5
+        if looksLikeNotFoundCode { return true }
+        if let message = ns.userInfo[NSLocalizedDescriptionKey] as? String,
+           message.localizedCaseInsensitiveContains("not found") {
+            return true
+        }
+        return false
+    }
 
     private func encodeAndSet<T: Encodable>(_ value: T, at ref: DocumentReference, merge: Bool = false) async throws {
         let data = try Firestore.Encoder().encode(value)
@@ -78,7 +90,26 @@ final class FirestoreService {
     // MARK: - Bookings
 
     func createBooking(_ booking: Booking) async throws {
-        try await encodeAndSet(booking, at: db.collection("bookings").document(booking.id))
+        do {
+            try await BookingFunctionsService.createBookingRequest(booking)
+        } catch {
+            guard isFunctionUnavailableError(error) else { throw error }
+            // Dev fallback: preserve the server invariant (one blocking booking per patient).
+            let existing = try await db.collection("bookings")
+                .whereField("userId", isEqualTo: booking.userId)
+                .whereField("status", in: Booking.BookingStatus.allCases.filter(\.blocksNewBookingRequest).map(\.rawValue))
+                .limit(to: 1)
+                .getDocuments()
+            guard existing.documents.isEmpty else {
+                throw NSError(
+                    domain: "BookingFunctionsFallback",
+                    code: 412,
+                    userInfo: [NSLocalizedDescriptionKey: "You already have an active booking request."]
+                )
+            }
+            // Keep booking flow usable if callable is not deployed yet.
+            try await encodeAndSet(booking, at: db.collection("bookings").document(booking.id))
+        }
     }
 
     func fetchBooking(bookingId: String) async throws -> Booking? {
@@ -207,9 +238,15 @@ final class FirestoreService {
     }
 
     func updateBookingStatus(bookingId: String, status: Booking.BookingStatus) async throws {
-        try await db.collection("bookings").document(bookingId).updateData([
-            "status": status.rawValue
-        ])
+        do {
+            try await BookingFunctionsService.updateBookingStatus(bookingId: bookingId, newStatus: status)
+        } catch {
+            guard isFunctionUnavailableError(error) else { throw error }
+            // Dev fallback: keep caregiver/patient transitions usable before functions deploy.
+            try await db.collection("bookings").document(bookingId).updateData([
+                "status": status.rawValue
+            ])
+        }
     }
 
     func requestBookingCancellation(
@@ -260,23 +297,38 @@ final class FirestoreService {
             try? await clearBookingCancellationRequest(bookingId: bookingId)
         }
 
-        var updated = booking
-        updated.status = newStatus
-        if let connectionStatus = BookingStateMachine.connectionStatusAfterTransition(
-            from: booking.status,
-            to: newStatus,
-            actor: actor
-        ) {
-            try await upsertConnectionForBooking(booking: updated, status: connectionStatus)
+        guard let refreshed = try await fetchBooking(bookingId: bookingId) else {
+            throw BookingStateMachine.TransitionError.bookingNotFound
         }
 
-        try? await createBookingTransitionNotifications(
+        if let connectionStatus = BookingStateMachine.connectionStatusAfterTransition(
+            from: booking.status,
+            to: refreshed.status,
+            actor: actor
+        ) {
+            try? await upsertConnectionForBooking(booking: refreshed, status: connectionStatus)
+        }
+
+        try await createBookingTransitionNotifications(
             previous: booking,
-            updated: updated,
+            updated: refreshed,
             actor: actor,
             callerUid: callerUid
         )
-        return updated
+        // If the booking reached a terminal state, and the caregiver's active
+        // patient selection matches this booking's patient, clear it so the
+        // caregiver home returns to a clean state.
+        if refreshed.status == .cancelled || refreshed.status == .completed {
+            let bookingPatientId = refreshed.careRecipientId ?? refreshed.userId
+            if !bookingPatientId.isEmpty {
+                if let active = try? await fetchActivePatientForCaregiver(caregiverId: refreshed.caregiverId),
+                   active.patientId == bookingPatientId {
+                    try? await clearActivePatientForCaregiver(caregiverId: refreshed.caregiverId)
+                }
+            }
+        }
+
+        return refreshed
     }
 
     private func createBookingTransitionNotifications(
@@ -310,7 +362,7 @@ final class FirestoreService {
 
         switch updated.status {
         case .confirmed:
-            if actor == .caregiver {
+            if case .caregiver = actor {
                 try await make(
                     to: patientId,
                     title: "Booking confirmed",

@@ -21,20 +21,26 @@ struct CLNavigationBar: View {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(CLTheme.textPrimary)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 44, height: 44)
                             .background(CLTheme.backgroundSecondary)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "Back"))
+                    .accessibilityHint(String(localized: "Returns to the previous screen"))
+                    .accessibilityAddTraits(.isButton)
                 } else {
                     HStack(spacing: CLTheme.spacingSM) {
                         Image(systemName: "cross.circle.fill")
                             .font(.system(size: 28))
                             .foregroundStyle(CLTheme.primaryNavy)
+                            .accessibilityHidden(true)
                         Text("CareLink")
                             .font(.system(size: 22, weight: .bold, design: .rounded))
                             .foregroundStyle(CLTheme.primaryNavy)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "CareLink"))
                 }
 
                 if let title {
@@ -53,12 +59,14 @@ struct CLNavigationBar: View {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                             .font(.system(size: 17, weight: .medium))
                             .foregroundStyle(CLTheme.textPrimary)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 44, height: 44)
                             .background(CLTheme.backgroundSecondary)
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Open filters")
+                    .accessibilityLabel(String(localized: "Filters"))
+                    .accessibilityHint(String(localized: "Opens sorting and filter options"))
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             .padding(.horizontal, CLTheme.spacingMD)

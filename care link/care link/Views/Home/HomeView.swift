@@ -20,6 +20,7 @@ struct HomeView: View {
     @State private var showFilters = false
     @State private var showCancelRequestConfirmation = false
     @State private var isCancellingRequest = false
+    @State private var cancelRequestError: String?
     @State private var lastKnownCareBookingId: String?
     @State private var isReconcilingBookingState = false
 
@@ -117,6 +118,14 @@ struct HomeView: View {
             } message: {
                 Text("This will cancel your current caregiver request.")
             }
+            .alert("Could not send cancellation", isPresented: Binding(
+                get: { cancelRequestError != nil },
+                set: { if !$0 { cancelRequestError = nil } }
+            )) {
+                Button("OK", role: .cancel) { cancelRequestError = nil }
+            } message: {
+                Text(cancelRequestError ?? "")
+            }
             .onAppear { syncMainTabBarVisibility() }
             .onAppear {
                 Task {
@@ -151,6 +160,21 @@ struct HomeView: View {
 
     private func syncMainTabBarVisibility() {
         suppressMainTabBar = showCaregiverProfile || showChat
+    }
+
+    private func bookingStatusColor(_ status: Booking.BookingStatus) -> Color {
+        switch status {
+        case .awaitingCaregiver, .pending:
+            return CLTheme.warningOrange
+        case .confirmed:
+            return CLTheme.successGreen
+        case .inProgress:
+            return CLTheme.tealAccent
+        case .completed:
+            return CLTheme.accentBlue
+        case .cancelled:
+            return CLTheme.errorRed
+        }
     }
 
     // MARK: - Greeting
@@ -211,11 +235,16 @@ struct HomeView: View {
                         .foregroundStyle(CLTheme.textPrimary)
                     Spacer()
                     HStack(spacing: 4) {
-                        Circle().fill(CLTheme.successGreen).frame(width: 8, height: 8)
-                        Text("Confirmed")
+                        Circle()
+                            .fill(bookingStatusColor(booking.status))
+                            .frame(width: 8, height: 8)
+                            .accessibilityHidden(true)
+                        Text(booking.status.rawValue)
                             .font(CLTheme.captionFont)
-                            .foregroundStyle(CLTheme.successGreen)
+                            .foregroundStyle(bookingStatusColor(booking.status))
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(String(localized: "Booking status: \(booking.status.rawValue)"))
                 }
                 .padding(.horizontal, CLTheme.spacingMD)
 
@@ -237,7 +266,8 @@ struct HomeView: View {
                         CaregiverAvatar(
                             size: 65,
                             imageURL: heroCaregiver?.imageURL ?? booking.caregiverImageURL,
-                            showVerified: heroCaregiver?.isVerified ?? false
+                            showVerified: heroCaregiver?.isVerified ?? false,
+                            accessibilityName: heroCaregiver?.name ?? booking.caregiverName
                         )
 
                         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
@@ -287,6 +317,9 @@ struct HomeView: View {
                             .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Open chat with \(heroCaregiver?.name ?? booking.caregiverName)"))
+                        .accessibilityHint(String(localized: "Opens messages with your caregiver"))
+                        .accessibilityAddTraits(.isButton)
 
                         Button {
                             if let caregiver = heroCaregiver {
@@ -312,6 +345,9 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(heroCaregiver == nil)
+                        .accessibilityLabel(String(localized: "Caregiver details"))
+                        .accessibilityHint(String(localized: "Opens the caregiver profile"))
+                        .accessibilityAddTraits(.isButton)
                     }
                     .padding(.top, CLTheme.spacingMD)
 
@@ -370,7 +406,8 @@ struct HomeView: View {
                             CaregiverAvatar(
                                 size: 56,
                                 imageURL: heroCaregiver?.imageURL ?? booking.caregiverImageURL,
-                                showVerified: heroCaregiver?.isVerified ?? false
+                                showVerified: heroCaregiver?.isVerified ?? false,
+                                accessibilityName: heroCaregiver?.name ?? booking.caregiverName
                             )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(heroCaregiver?.name ?? booking.caregiverName)
@@ -960,7 +997,9 @@ struct HomeView: View {
                     }
                 }
             } catch {
-                // Reuse global error surfaces elsewhere; UI is kept simple here.
+                await MainActor.run {
+                    cancelRequestError = error.localizedDescription
+                }
             }
             await MainActor.run {
                 isCancellingRequest = false

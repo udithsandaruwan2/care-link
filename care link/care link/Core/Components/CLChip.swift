@@ -6,24 +6,42 @@ struct CLChip: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        Button {
-            action?()
-        } label: {
-            Text(title)
-                .font(CLTheme.calloutFont)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 10)
-                .foregroundStyle(isSelected ? .white : CLTheme.textPrimary)
-                .background(isSelected ? CLTheme.primaryNavy : CLTheme.cardBackground)
-                .clipShape(Capsule())
-                .overlay {
-                    if !isSelected {
-                        Capsule()
-                            .stroke(CLTheme.divider, lineWidth: 1)
-                    }
+        Group {
+            if let action {
+                Button {
+                    action()
+                } label: {
+                    chipLabel
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+                .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityValue(isSelected ? String(localized: "Selected") : String(localized: "Not selected"))
+            } else {
+                chipLabel
+                    .accessibilityLabel(title)
+                    .accessibilityValue(isSelected ? String(localized: "Selected") : String(localized: "Not selected"))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
         }
-        .buttonStyle(.plain)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+    }
+
+    private var chipLabel: some View {
+        Text(title)
+            .font(CLTheme.calloutFont)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .foregroundStyle(isSelected ? .white : CLTheme.textPrimary)
+            .background(isSelected ? CLTheme.primaryNavy : CLTheme.cardBackground)
+            .clipShape(Capsule())
+            .overlay {
+                if !isSelected {
+                    Capsule()
+                        .stroke(CLTheme.divider, lineWidth: 1)
+                }
+            }
     }
 }
 
@@ -50,6 +68,8 @@ struct CLBadge: View {
                         .stroke(CLTheme.divider, lineWidth: 1)
                 }
             }
+            .accessibilityLabel(title)
+            .accessibilityAddTraits(.isStaticText)
     }
 }
 

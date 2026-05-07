@@ -11,15 +11,25 @@ struct CaregiverHomeView: View {
     @State private var isLoading = true
     @State private var activePatientSelection: CaregiverActivePatientSelection?
     @State private var activePatientProfile: CLUser?
+    @State private var selectedProfileBooking: Booking?
     @State private var showMedicalRecords = false
+    @State private var showPatientProfile = false
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
+    @State private var isRequestingCancellation = false
+
+    private var openCareStatuses: Set<Booking.BookingStatus> {
+        [.awaitingCaregiver, .pending, .confirmed, .inProgress]
+    }
 
     private var activePatientBooking: Booking? {
-        guard let patientId = activePatientSelection?.patientId else { return nil }
-        return bookings.first {
-            $0.userId == patientId && ($0.status == .inProgress || $0.status == .confirmed)
+        if let patientId = activePatientSelection?.patientId,
+           let selectedMatch = bookings.first(where: {
+               ($0.userId == patientId || $0.careRecipientId == patientId) && openCareStatuses.contains($0.status)
+           }) {
+            return selectedMatch
         }
+        return bookings.first { openCareStatuses.contains($0.status) }
     }
 
     private var pendingCount: Int {
@@ -31,15 +41,19 @@ struct CaregiverHomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: CLTheme.spacingLG) {
                     greetingSection
-                    if let profile = activePatientProfile, let booking = activePatientBooking {
-                        activePatientCard(profile, booking: booking)
+                    if let booking = activePatientBooking {
+                        activePatientCard(activePatientProfile, booking: booking)
                     } else if let profile = activePatientProfile {
                         selectedButNotActiveCard(profile)
                     } else {
                         noActivePatientCard
                     }
                     quickStats
-                    CLButton(title: "Open Caregiver Dashboard", icon: "rectangle.grid.2x2.fill") {
+                    CLButton(
+                        title: "Open Caregiver Dashboard",
+                        icon: "rectangle.grid.2x2.fill",
+                        accessibilityHintText: String(localized: "Shows patients, appointments, and booking actions")
+                    ) {
                         showDashboard = true
                     }
                     .padding(.horizontal, CLTheme.spacingMD)
@@ -61,6 +75,10 @@ struct CaregiverHomeView: View {
                     )
                     .environment(appState)
                 }
+            }
+            .navigationDestination(isPresented: $showPatientProfile) {
+                PatientProfileView(patient: activePatientProfile, booking: selectedProfileBooking ?? activePatientBooking)
+                    .environment(appState)
             }
             .navigationDestination(isPresented: $showChat) {
                 if let conv = chatConversation {
@@ -101,26 +119,38 @@ struct CaregiverHomeView: View {
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
-    private func activePatientCard(_ patient: CLUser, booking: Booking) -> some View {
-        CLCard {
+    private func activePatientCard(_ patient: CLUser?, booking: Booking) -> some View {
+        let patientName = patient?.fullName
+            ?? (activePatientSelection?.patientName.isEmpty == false ? activePatientSelection?.patientName : nil)
+            ?? (booking.patientName.isEmpty ? "Patient" : booking.patientName)
+        let isLiveSession = booking.status == .inProgress || booking.status == .confirmed
+
+        return CLCard {
             VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
                 HStack {
                     Text("Active patient")
                         .font(CLTheme.title2Font)
                         .foregroundStyle(CLTheme.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
-                    Text("LIVE")
+                    Text(isLiveSession ? "LIVE" : "REQUESTED")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(CLTheme.successGreen)
+                        .background(isLiveSession ? CLTheme.successGreen : CLTheme.warningOrange)
                         .clipShape(Capsule())
+                        .accessibilityLabel(
+                            isLiveSession
+                                ? String(localized: "Live session")
+                                : String(localized: "Requested session")
+                        )
                 }
-                Text(patient.fullName)
+                .accessibilityElement(children: .combine)
+                Text(patientName)
                     .font(CLTheme.headlineFont)
                     .foregroundStyle(CLTheme.primaryNavy)
-                Text(patient.phoneNumber.isEmpty ? "No phone on file" : patient.phoneNumber)
+                Text(patient?.phoneNumber.isEmpty == false ? patient?.phoneNumber ?? "" : "No phone on file")
                     .font(CLTheme.captionFont)
                     .foregroundStyle(CLTheme.textSecondary)
 
@@ -138,7 +168,11 @@ struct CaregiverHomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: CLTheme.spacingSM) {
                         Button {
-                            openChatWithActivePatient(patient)
+                            if let patient {
+                                openChatWithActivePatient(patient)
+                            } else {
+                                openChatWithActiveBooking(booking)
+                            }
                         } label: {
                             Label("Message", systemImage: "message.fill")
                                 .font(CLTheme.calloutFont)
@@ -150,7 +184,7 @@ struct CaregiverHomeView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if let url = phoneURL(for: patient.phoneNumber) {
+                        if let url = phoneURL(for: patient?.phoneNumber ?? "") {
                             Link(destination: url) {
                                 Label("Call", systemImage: "phone.fill")
                                     .font(CLTheme.calloutFont)
@@ -163,10 +197,26 @@ struct CaregiverHomeView: View {
                             .buttonStyle(.plain)
                         }
 
+                        if activePatientProfile != nil {
+                            Button {
+                                showMedicalRecords = true
+                            } label: {
+                                Label("Records", systemImage: "doc.text.fill")
+                                    .font(CLTheme.calloutFont)
+                                    .foregroundStyle(CLTheme.primaryNavy)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(CLTheme.lightBlue)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         Button {
-                            showMedicalRecords = true
+                            selectedProfileBooking = booking
+                            showPatientProfile = true
                         } label: {
-                            Label("Records", systemImage: "doc.text.fill")
+                            Label("Profile", systemImage: "person.crop.circle")
                                 .font(CLTheme.calloutFont)
                                 .foregroundStyle(CLTheme.primaryNavy)
                                 .padding(.horizontal, 14)
@@ -175,6 +225,41 @@ struct CaregiverHomeView: View {
                                 .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+
+                if booking.cancellationRequestedByUid == nil {
+                    Button {
+                        requestCancellation(for: booking)
+                    } label: {
+                        HStack {
+                            if isRequestingCancellation {
+                                ProgressView()
+                                    .tint(CLTheme.warningOrange)
+                            } else {
+                                Image(systemName: "xmark.circle")
+                            }
+                            Text(isRequestingCancellation ? "Requesting..." : "Request cancellation")
+                        }
+                        .font(CLTheme.calloutFont)
+                        .foregroundStyle(CLTheme.warningOrange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(CLTheme.warningOrange.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRequestingCancellation)
+                    .accessibilityLabel(String(localized: "Request cancellation"))
+                    .accessibilityHint(String(localized: "Asks to cancel this booking"))
+                    .careLinkAccessibilityValue(isRequestingCancellation ? String(localized: "Processing") : nil)
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .foregroundStyle(CLTheme.warningOrange)
+                        Text("Cancellation already requested")
+                            .font(CLTheme.captionFont)
+                            .foregroundStyle(CLTheme.textSecondary)
                     }
                 }
             }
@@ -188,7 +273,7 @@ struct CaregiverHomeView: View {
                 Text("No active session")
                     .font(CLTheme.title2Font)
                     .foregroundStyle(CLTheme.textPrimary)
-                Text("\(patient.fullName) is selected, but there is no confirmed or in-progress booking.")
+                Text("\(patient.fullName) is selected, but there is no open booking request or live session.")
                     .font(CLTheme.bodyFont)
                     .foregroundStyle(CLTheme.textSecondary)
             }
@@ -235,6 +320,7 @@ struct CaregiverHomeView: View {
         .padding(CLTheme.spacingMD)
         .background(CLTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     private func loadHomeData() async {
@@ -245,13 +331,12 @@ struct CaregiverHomeView: View {
         bookings = (try? await bookingsTask) ?? []
         activePatientSelection = try? await activeSelectionTask
 
+        // Do NOT auto-select a patient from open bookings. Caregiver must explicitly
+        // set an active patient via the dashboard. This prevents accidental fallback
+        // to the first open booking and matches the new semantics.
+
         if let patientId = activePatientSelection?.patientId {
             activePatientProfile = try? await appState.firestoreService.fetchUser(patientId)
-            if activePatientProfile == nil {
-                // Selected patient no longer exists or is inaccessible.
-                try? await appState.firestoreService.clearActivePatientForCaregiver(caregiverId: caregiverId)
-                activePatientSelection = nil
-            }
         } else {
             activePatientProfile = nil
         }
@@ -274,6 +359,23 @@ struct CaregiverHomeView: View {
         }
     }
 
+    private func openChatWithActiveBooking(_ booking: Booking) {
+        Task {
+            let caregiverId = appState.authService.currentUser?.uid ?? ""
+            let caregiverName = appState.authService.userProfile?.fullName ?? "Caregiver"
+            let userName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+            let conv = try? await appState.chatService.getOrCreateConversation(
+                userId: booking.userId,
+                userName: userName,
+                caregiverId: caregiverId,
+                caregiverName: caregiverName,
+                caregiverSpecialty: ""
+            )
+            chatConversation = conv
+            showChat = true
+        }
+    }
+
     private func phoneURL(for phone: String) -> URL? {
         let cleaned = phone
             .replacingOccurrences(of: " ", with: "")
@@ -286,6 +388,21 @@ struct CaregiverHomeView: View {
 
     private func syncMainTabBarVisibility() {
         suppressMainTabBar = showDashboard
+    }
+
+    private func requestCancellation(for booking: Booking) {
+        guard !isRequestingCancellation else { return }
+        isRequestingCancellation = true
+        let caregiverUid = appState.authService.currentUser?.uid ?? ""
+        Task {
+            defer { isRequestingCancellation = false }
+            try? await appState.firestoreService.requestBookingCancellation(
+                bookingId: booking.id,
+                requesterUid: caregiverUid,
+                requesterRole: .caregiver
+            )
+            await loadHomeData()
+        }
     }
 }
 

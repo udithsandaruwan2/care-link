@@ -4,6 +4,7 @@ import FirebaseAuth
 struct BookingDetailsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let caregiver: Caregiver
     @State private var viewModel = BookingViewModel()
     @State private var showConfirmation = false
@@ -47,21 +48,27 @@ struct BookingDetailsView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(CLTheme.textPrimary)
                 }
+                .accessibilityLabel(String(localized: "Back"))
+                .accessibilityHint(String(localized: "Returns to the previous screen"))
+                .careLinkMinimumTapTarget(44)
             }
             ToolbarItem(placement: .principal) {
                 HStack(spacing: CLTheme.spacingSM) {
                     Image(systemName: "cross.circle.fill")
                         .font(.system(size: 22))
                         .foregroundStyle(CLTheme.primaryNavy)
+                        .accessibilityHidden(true)
                     Text("CareLink")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(CLTheme.primaryNavy)
                 }
+                .accessibilityElement(children: .combine)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 16))
                     .foregroundStyle(CLTheme.textPrimary)
+                    .accessibilityHidden(true)
             }
         }
         .navigationDestination(isPresented: $showConfirmation) {
@@ -98,7 +105,12 @@ struct BookingDetailsView: View {
 
             CLCard {
                 HStack(spacing: CLTheme.spacingMD) {
-                    CaregiverAvatar(size: 55, imageURL: caregiver.imageURL, showVerified: caregiver.isVerified)
+                    CaregiverAvatar(
+                        size: 55,
+                        imageURL: caregiver.imageURL,
+                        showVerified: caregiver.isVerified,
+                        accessibilityName: caregiver.name
+                    )
 
                     VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
                         Text(caregiver.name)
@@ -108,10 +120,12 @@ struct BookingDetailsView: View {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 12))
                                 .foregroundStyle(CLTheme.tealAccent)
+                                .accessibilityHidden(true)
                             Text(caregiver.specialty)
                                 .font(CLTheme.captionFont)
                                 .foregroundStyle(CLTheme.textSecondary)
                         }
+                        .accessibilityElement(children: .combine)
                     }
 
                     Spacer()
@@ -194,10 +208,12 @@ struct BookingDetailsView: View {
             HStack(spacing: CLTheme.spacingSM) {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(CLTheme.accentBlue)
+                    .accessibilityHidden(true)
                 Text("Total duration: \(String(format: "%.1f", viewModel.duration)) hours")
                     .font(CLTheme.calloutFont)
                     .foregroundStyle(CLTheme.accentBlue)
             }
+            .accessibilityElement(children: .combine)
             if selectedRecipientId != "self", let relation = selectedFamilyMember?.relation {
                 Text("Care recipient: \(selectedRecipientName) (\(relation))")
                     .font(CLTheme.captionFont)
@@ -211,6 +227,7 @@ struct BookingDetailsView: View {
                 HStack(spacing: 8) {
                     Image(systemName: risk.level == .high ? "exclamationmark.triangle.fill" : "shield.lefthalf.filled")
                         .foregroundStyle(riskColor(risk.level))
+                        .accessibilityHidden(true)
                     Text("\(risk.shortText) for this slot")
                         .font(CLTheme.captionFont)
                         .foregroundStyle(riskColor(risk.level))
@@ -219,6 +236,7 @@ struct BookingDetailsView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(CLTheme.textTertiary)
                 }
+                .accessibilityElement(children: .combine)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -277,6 +295,9 @@ struct BookingDetailsView: View {
             .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(subtitle)")
+        .accessibilityValue(isSelected ? String(localized: "Selected") : String(localized: "Not selected"))
+        .accessibilityHint(String(localized: "Selects this person as who needs care for this booking"))
     }
 
     private var popularDurationsSection: some View {
@@ -324,8 +345,12 @@ struct BookingDetailsView: View {
     private func paymentMethodCard(_ method: Booking.PaymentMethod) -> some View {
         let isSelected = viewModel.selectedPaymentMethod == method
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            if reduceMotion {
                 viewModel.selectedPaymentMethod = method
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.selectedPaymentMethod = method
+                }
             }
         } label: {
             VStack(spacing: CLTheme.spacingSM) {
@@ -360,6 +385,14 @@ struct BookingDetailsView: View {
                             lineWidth: isSelected ? 2 : 1)
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(method.displayName)
+        .accessibilityValue(isSelected ? String(localized: "Selected") : String(localized: "Not selected"))
+        .accessibilityHint(
+            method == .card
+                ? String(localized: "Pay with a card on file or at booking time")
+                : String(localized: "Pay the caregiver directly without a card in the app")
+        )
     }
 
     private var bottomBar: some View {
@@ -373,6 +406,7 @@ struct BookingDetailsView: View {
                         Image(systemName: viewModel.selectedPaymentMethod.iconName)
                             .font(.system(size: 12))
                             .foregroundStyle(Color(hex: viewModel.selectedPaymentMethod.colorHex))
+                            .accessibilityHidden(true)
                         Text(viewModel.selectedPaymentMethod.displayName)
                             .font(CLTheme.captionFont)
                             .foregroundStyle(Color(hex: viewModel.selectedPaymentMethod.colorHex))
@@ -383,8 +417,14 @@ struct BookingDetailsView: View {
                     .font(CLTheme.titleFont)
                     .foregroundStyle(CLTheme.textPrimary)
             }
+            .accessibilityElement(children: .combine)
 
-            CLButton(title: "Confirm Booking", icon: "arrow.right", isLoading: viewModel.isLoading) {
+            CLButton(
+                title: "Confirm Booking",
+                icon: "arrow.right",
+                isLoading: viewModel.isLoading,
+                accessibilityHintText: String(localized: "Submits your booking request to this caregiver")
+            ) {
                 Task {
                     guard appState.networkMonitor.isConnected else {
                         showInternetAlert = true

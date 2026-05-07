@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Build and test iOS
+        run: xcodebuild -project "care link/care link.xcodeproj" -scheme "care link" -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO -destination 'platform=iOS Simulator,name=iPhone 16' test
+
+  functions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install and test
+        run: npm ci && npm run build && npm test

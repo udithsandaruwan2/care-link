@@ -2,6 +2,28 @@ import SwiftUI
 import CoreData
 import FirebaseAuth
 
+extension Notification.Name {
+    /// Posted from `AppDelegate` when the user taps a push notification. `userInfo` should include `bookingId` and/or `conversationId` (FCM data keys).
+    static let careLinkPushNotificationTapped = Notification.Name("careLinkPushNotificationTapped")
+}
+
+private final class PushNotificationObserver: NSObject {
+    weak var appState: AppState?
+
+    init(appState: AppState) {
+        self.appState = appState
+    }
+
+    @objc func handlePushNotificationTapped(_ note: Notification) {
+        let bookingId = AppState.pushRouteValue(from: note.userInfo, key: "bookingId")
+        let conversationId = AppState.pushRouteValue(from: note.userInfo, key: "conversationId")
+
+        Task { @MainActor [weak appState, bookingId, conversationId] in
+            appState?.applyPushRouting(bookingId: bookingId, conversationId: conversationId)
+        }
+    }
+}
+
 @Observable
 final class AppState {
     /// When true (after user opts in), reopening the app with a Firebase session requires biometric unlock.
@@ -22,6 +44,13 @@ final class AppState {
     private var didRunProfileBiometricLockPass = false
     var navigationResetToken = UUID()
 
+    /// Filled when a push payload includes `bookingId`; `MainTabView` switches to Alerts.
+    var pendingPushBookingId: String?
+    /// Filled when a push payload includes `conversationId`; `ChatListView` opens that thread.
+    var pendingPushConversationId: String?
+
+    private var pushObserver: PushNotificationObserver?
+
     let authService = AuthService()
     let firestoreService = FirestoreService()
     let chatService = ChatService()
@@ -34,6 +63,52 @@ final class AppState {
     let recommendationService = RecommendationService()
     let coreMLRecommendationService = CoreMLRecommendationService()
     let coreMLBookingRiskService = CoreMLBookingRiskService()
+
+    init() {
+        let observer = PushNotificationObserver(appState: self)
+        pushObserver = observer
+        NotificationCenter.default.addObserver(
+            observer,
+            selector: #selector(PushNotificationObserver.handlePushNotificationTapped(_:)),
+            name: .careLinkPushNotificationTapped,
+            object: nil
+        )
+    }
+
+    deinit {
+        if let pushObserver {
+            NotificationCenter.default.removeObserver(pushObserver)
+        }
+    }
+
+    /// Maps FCM / APNs `userInfo` after the user taps a notification (`AppDelegate.userNotificationCenter(_:didReceive:)`).
+    ///
+    /// **Payload contract (send in the FCM *data* map, not only notification title/body):**
+    /// - `bookingId` (string): switches to the Alerts tab; see `MainTabView`.
+    /// - `conversationId` (string): opens that chat; see `ChatListView`.
+    ///
+    /// Values may appear at the top level of `userInfo` or under `userInfo["data"]` as `[String: Any]`.
+    @MainActor
+    fileprivate func applyPushRouting(bookingId: String?, conversationId: String?) {
+        if let bid = bookingId {
+            pendingPushBookingId = bid
+        }
+        if let cid = conversationId {
+            pendingPushConversationId = cid
+        }
+    }
+
+    fileprivate static func pushRouteValue(from userInfo: [AnyHashable: Any]?, key: String) -> String? {
+        guard let userInfo else { return nil }
+
+        if let value = userInfo[key] as? String, !value.isEmpty {
+            return value
+        }
+        if let data = userInfo["data"] as? [String: Any], let value = data[key] as? String, !value.isEmpty {
+            return value
+        }
+        return nil
+    }
 
     func checkAuthState() {
         authService.checkCurrentUser()

@@ -64,19 +64,20 @@ struct CaregiverProfileView: View {
 
     private func loadData() async {
         let userId = appState.authService.currentUser?.uid ?? ""
-        async let reviewsTask: () = {
-            self.reviews = (try? await appState.firestoreService.fetchReviews(for: caregiver.id)) ?? []
-        }()
-        async let connectionTask: () = {
-            self.existingConnection = try? await appState.firestoreService.checkExistingConnection(
-                userId: userId, caregiverId: caregiver.id
-            )
-        }()
-        async let bookingTask: () = {
-            let bookings = (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
-            self.activePatientBooking = bookings.first { $0.status.blocksNewBookingRequest }
-        }()
-        _ = await (reviewsTask, connectionTask, bookingTask)
+        async let reviewsTask = appState.firestoreService.fetchReviews(for: caregiver.id)
+        async let connectionTask = appState.firestoreService.checkExistingConnection(
+            userId: userId,
+            caregiverId: caregiver.id
+        )
+        async let bookingTask = appState.firestoreService.fetchBookings(for: userId)
+
+        let loadedReviews = (try? await reviewsTask) ?? []
+        let loadedConnection = try? await connectionTask
+        let loadedBookings = (try? await bookingTask) ?? []
+
+        self.reviews = loadedReviews
+        self.existingConnection = loadedConnection
+        self.activePatientBooking = loadedBookings.first { $0.status.blocksNewBookingRequest }
     }
 
     // MARK: - Connection Status Banner
@@ -101,7 +102,12 @@ struct CaregiverProfileView: View {
 
     private var profileHeader: some View {
         VStack(spacing: CLTheme.spacingMD) {
-            CaregiverAvatar(size: 100, imageURL: caregiver.imageURL, showVerified: caregiver.isVerified)
+            CaregiverAvatar(
+                size: 100,
+                imageURL: caregiver.imageURL,
+                showVerified: caregiver.isVerified,
+                accessibilityName: caregiver.name
+            )
 
             VStack(spacing: CLTheme.spacingXS) {
                 Text("\(caregiver.name), \(caregiver.title)")
@@ -404,7 +410,7 @@ struct CaregiverProfileView: View {
                 try? await appState.firestoreService.createNotification(
                     CLNotification(
                         id: UUID().uuidString,
-                        userId: caregiver.id,
+                        userId: caregiver.userId,
                         senderUserId: userId,
                         title: "New connection request",
                         message: "\(userName) requested an ongoing care connection.",

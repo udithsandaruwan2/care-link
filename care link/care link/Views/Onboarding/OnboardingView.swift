@@ -4,6 +4,7 @@ struct OnboardingView: View {
     var onComplete: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var currentPage = 0
 
     private let pages: [OnboardingPage] = [
@@ -46,10 +47,12 @@ struct OnboardingView: View {
                     Image(systemName: "cross.circle.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(CLTheme.primaryNavy)
+                        .accessibilityHidden(true)
                     Text("CareLink")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(CLTheme.primaryNavy)
                 }
+                .accessibilityElement(children: .combine)
                 Spacer()
                 Button("Skip") {
                     onComplete()
@@ -61,6 +64,8 @@ struct OnboardingView: View {
                 .background(CLTheme.backgroundSecondary)
                 .clipShape(Capsule())
                 .buttonStyle(.plain)
+                .accessibilityHint(String(localized: "Skips the introduction and continues to the app"))
+                .careLinkMinimumTapTarget(44)
             }
             .padding(.horizontal, CLTheme.spacingMD)
             .padding(.top, CLTheme.spacingSM)
@@ -79,33 +84,49 @@ struct OnboardingView: View {
                         Capsule()
                             .fill(currentPage == index ? CLTheme.primaryNavy : CLTheme.divider)
                             .frame(width: currentPage == index ? 24 : 8, height: 8)
-                            .animation(.spring(response: 0.3), value: currentPage)
+                            .animation(reduceMotion ? .none : .spring(response: 0.3), value: currentPage)
                     }
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    String(
+                        format: String(localized: "Page %1$lld of %2$lld"),
+                        locale: .current,
+                        currentPage + 1,
+                        pages.count
+                    )
+                )
 
                 CLButton(
                     title: currentPage == pages.count - 1 ? "Done" : "Next",
-                    icon: "arrow.right"
+                    icon: "arrow.right",
+                    accessibilityHintText: currentPage == pages.count - 1
+                        ? String(localized: "Finishes onboarding and continues")
+                        : String(localized: "Shows the next introduction screen")
                 ) {
                     if currentPage < pages.count - 1 {
-                        withAnimation { currentPage += 1 }
+                        if reduceMotion {
+                            currentPage += 1
+                        } else {
+                            withAnimation { currentPage += 1 }
+                        }
                     } else {
                         onComplete()
                     }
                 }
                 .padding(.horizontal, CLTheme.spacingLG)
 
-                Text("By continuing, you agree to our ")
-                    .font(CLTheme.captionFont)
-                    .foregroundStyle(CLTheme.textTertiary)
-                +
-                Text("Terms of Service")
-                    .font(CLTheme.captionFont)
-                    .foregroundStyle(CLTheme.accentBlue)
-                +
-                Text(" and Privacy Policy.")
-                    .font(CLTheme.captionFont)
-                    .foregroundStyle(CLTheme.textTertiary)
+                HStack(spacing: 0) {
+                    Text("By continuing, you agree to our ")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textTertiary)
+                    Text("Terms of Service")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.accentBlue)
+                    Text(" and Privacy Policy.")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textTertiary)
+                }
             }
             .padding(.bottom, CLTheme.spacingXL)
         }

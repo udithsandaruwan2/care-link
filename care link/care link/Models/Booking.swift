@@ -51,9 +51,19 @@ struct Booking: Identifiable, Codable, Sendable {
             self == .awaitingCaregiver || self == .pending
         }
 
+        var isPendingRequest: Bool {
+            self == .awaitingCaregiver || self == .pending
+        }
+
+        var isActiveSession: Bool {
+            self == .confirmed || self == .inProgress
+        }
+
         /// While in these states, patient should not create another booking request.
+        /// NOTE: Only confirmed/in-progress sessions block creating a new booking; pending
+        /// caregiver requests no longer prevent the user from starting another request.
         var blocksNewBookingRequest: Bool {
-            self == .awaitingCaregiver || self == .pending || self == .confirmed || self == .inProgress
+            isActiveSession
         }
     }
 

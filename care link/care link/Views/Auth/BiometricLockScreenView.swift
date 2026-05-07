@@ -3,11 +3,12 @@ import SwiftUI
 /// Full-screen gate shown when the app was backgrounded and the user has Face ID / Touch ID enabled.
 struct BiometricLockScreenView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
     @State private var isMatching = false
 
     var body: some View {
-        ZStack {
+    ZStack {
             CLTheme.primaryNavy
                 .ignoresSafeArea()
 
@@ -20,6 +21,7 @@ struct BiometricLockScreenView: View {
                     Text("CareLink is locked")
                         .font(CLTheme.titleFont)
                         .foregroundStyle(.white)
+                        .accessibilityAddTraits(.isHeader)
 
                     Text("Face matching starts automatically. If biometrics are unavailable, sign out and log in manually.")
                         .font(CLTheme.bodyFont)
@@ -39,16 +41,26 @@ struct BiometricLockScreenView: View {
                 .font(CLTheme.calloutFont)
                 .foregroundStyle(.white.opacity(0.75))
                 .padding(.top, CLTheme.spacingSM)
+                .accessibilityLabel(String(localized: "Sign out"))
+                .accessibilityHint(String(localized: "Ends your session and returns to the sign-in screen"))
+                .accessibilityAddTraits(.isButton)
 
                 Spacer()
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(String(localized: "App locked"))
+        .accessibilityAddTraits(.isModal)
         .task {
             isMatching = true
             await appState.unlockAppWithBiometrics()
             isMatching = false
         }
         .onAppear {
+            guard !reduceMotion else {
+                pulse = true
+                return
+            }
             withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                 pulse = true
             }
@@ -76,7 +88,7 @@ struct BiometricLockScreenView: View {
                         Circle()
                             .fill(isMatching ? CLTheme.tealAccent : CLTheme.lightBlue.opacity(0.75))
                             .frame(width: 8, height: 8)
-                            .scaleEffect(isMatching && pulse ? 1.25 : 1)
+                            .scaleEffect(reduceMotion ? 1 : (isMatching && pulse ? 1.25 : 1))
                     }
                     .padding(.horizontal, CLTheme.spacingMD)
                 }
@@ -95,7 +107,7 @@ struct BiometricLockScreenView: View {
                     Image(systemName: appState.biometricService.biometricIcon)
                         .font(.system(size: 52))
                         .foregroundStyle(.white)
-                        .scaleEffect(isMatching && pulse ? 1.06 : 1)
+                        .scaleEffect(reduceMotion ? 1 : (isMatching && pulse ? 1.06 : 1))
                 }
         }
     }

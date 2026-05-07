@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var showFamilyMembers = false
     @State private var showPaymentMethods = false
     @State private var showMyCareHub = false
+    @State private var showLearningCenter = false
     @State private var showSupportCenter = false
     @State private var showPrivacyPolicy = false
     @State private var bookings: [Booking] = []
@@ -40,6 +41,9 @@ struct ProfileView: View {
                         Image(systemName: "gearshape")
                             .foregroundStyle(CLTheme.textPrimary)
                     }
+                    .accessibilityLabel(String(localized: "Settings"))
+                    .accessibilityHint(String(localized: "Opens app settings"))
+                    .careLinkMinimumTapTarget(44)
                 }
             }
             .sheet(isPresented: $showSettings) {
@@ -62,6 +66,9 @@ struct ProfileView: View {
                 MyCareHubView()
                     .environment(appState)
             }
+            .navigationDestination(isPresented: $showLearningCenter) {
+                LearningCenterView()
+            }
             .navigationDestination(isPresented: $showMedicalRecords) {
                 let userId = appState.authService.currentUser?.uid ?? ""
                 let userName = appState.authService.userProfile?.fullName ?? "Patient"
@@ -76,13 +83,12 @@ struct ProfileView: View {
             }
             .task {
                 let userId = appState.authService.currentUser?.uid ?? ""
-                async let bookingsTask: () = {
-                    self.bookings = (try? await appState.firestoreService.fetchBookings(for: userId)) ?? []
-                }()
-                async let connectionsTask: () = {
-                    self.connections = (try? await appState.firestoreService.fetchConnectionsForUser(userId)) ?? []
-                }()
-                _ = await (bookingsTask, connectionsTask)
+                async let bookingsTask = appState.firestoreService.fetchBookings(for: userId)
+                async let connectionsTask = appState.firestoreService.fetchConnectionsForUser(userId)
+                let loadedBookings = (try? await bookingsTask) ?? []
+                let loadedConnections = (try? await connectionsTask) ?? []
+                self.bookings = loadedBookings
+                self.connections = loadedConnections
                 if UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") {
                     await appState.healthKitService.refreshAuthorizationStatus()
                     await appState.healthKitService.refreshMetrics()
@@ -111,6 +117,9 @@ struct ProfileView: View {
                         .foregroundStyle(CLTheme.accentBlue)
                         .background(Circle().fill(.white).frame(width: 24, height: 24))
                 }
+                .accessibilityLabel(String(localized: "Edit profile"))
+                .accessibilityHint(String(localized: "Updates your name, contact details, and photo"))
+                .careLinkMinimumTapTarget(44)
             }
 
             VStack(spacing: CLTheme.spacingXS) {
@@ -129,6 +138,7 @@ struct ProfileView: View {
             }
         }
         .padding(.top, CLTheme.spacingLG)
+        .accessibilityElement(children: .combine)
     }
 
     private var quickStats: some View {
@@ -174,6 +184,7 @@ struct ProfileView: View {
         .background(highlighted ? AnyShapeStyle(CLTheme.gradientBlue) : AnyShapeStyle(CLTheme.cardBackground))
         .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
         .shadow(color: CLTheme.shadowLight, radius: 8, y: 3)
+        .accessibilityElement(children: .combine)
     }
 
     private var accountSection: some View {
@@ -199,6 +210,9 @@ struct ProfileView: View {
                 }
                 profileMenuRow(icon: "creditcard", title: "Payment Methods", subtitle: "Manage cards and billing") {
                     showPaymentMethods = true
+                }
+                profileMenuRow(icon: "graduationcap.fill", title: "Learning Center", subtitle: "Read quick guides and app tips") {
+                    showLearningCenter = true
                 }
                 if appState.currentUserRole == .user {
                     profileMenuRow(icon: "doc.text", title: "Medical Records", subtitle: "View your health records") {
@@ -235,6 +249,7 @@ struct ProfileView: View {
                 Text("Health Monitor")
                     .font(CLTheme.title2Font)
                     .foregroundStyle(CLTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text(appState.healthKitService.isAuthorized ? "Connected" : "Not Connected")
                     .font(CLTheme.captionFont)
@@ -243,8 +258,14 @@ struct ProfileView: View {
                     .padding(.vertical, 4)
                     .background((appState.healthKitService.isAuthorized ? CLTheme.successGreen : CLTheme.textTertiary).opacity(0.12))
                     .clipShape(Capsule())
+                    .accessibilityLabel(
+                        appState.healthKitService.isAuthorized
+                            ? String(localized: "Apple Health connected")
+                            : String(localized: "Apple Health not connected")
+                    )
             }
             .padding(.horizontal, CLTheme.spacingMD)
+            .accessibilityElement(children: .combine)
 
             HStack(spacing: CLTheme.spacingMD) {
                 healthTile(
@@ -277,6 +298,7 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 6) {
             Image(systemName: icon)
                 .foregroundStyle(color)
+                .accessibilityHidden(true)
             Text(title)
                 .font(CLTheme.captionFont)
                 .foregroundStyle(CLTheme.textSecondary)
@@ -293,6 +315,7 @@ struct ProfileView: View {
         .padding(CLTheme.spacingSM)
         .background(CLTheme.cardBackground)
         .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
+        .accessibilityElement(children: .combine)
     }
 
     private var signOutSection: some View {
@@ -313,6 +336,7 @@ struct ProfileView: View {
                 .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusLG))
             }
             .buttonStyle(.plain)
+            .accessibilityHint(String(localized: "Signs out of your CareLink account on this device"))
             .padding(.horizontal, CLTheme.spacingMD)
 
             Text("CARELINK VERSION 2.4.0")
@@ -351,6 +375,7 @@ struct ProfileView: View {
             .shadow(color: CLTheme.shadowLight, radius: 8, y: 2)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 }
 

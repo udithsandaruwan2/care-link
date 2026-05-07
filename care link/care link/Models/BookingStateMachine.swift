@@ -1,6 +1,7 @@
 import Foundation
 
 /// Single place for booking lifecycle rules (patient vs caregiver) and how they map to `connections`.
+/// Server enforcement lives in `functions/src/bookingRules.ts` — keep transitions in sync with that module and its tests (`npm run test` in `functions/`).
 enum BookingStateMachine: Sendable {
     enum Actor: Sendable {
         case patient
@@ -19,7 +20,12 @@ enum BookingStateMachine: Sendable {
             case .forbidden:
                 return "You are not allowed to change this booking."
             case .invalidTransition(let from, let to, let actor):
-                return "Cannot move booking from \(from.rawValue) to \(to.rawValue) as \(actor == .patient ? "patient" : "caregiver")."
+                let actorLabel: String
+                switch actor {
+                case .patient: actorLabel = "patient"
+                case .caregiver: actorLabel = "caregiver"
+                }
+                return "Cannot move booking from \(from.rawValue) to \(to.rawValue) as \(actorLabel)."
             }
         }
     }
@@ -85,7 +91,7 @@ enum BookingStateMachine: Sendable {
     ) -> Connection.ConnectionStatus? {
         switch next {
         case .confirmed:
-            guard actor == .caregiver else { return nil }
+            guard case .caregiver = actor else { return nil }
             guard previous == .awaitingCaregiver || previous == .pending else { return nil }
             return .approved
         case .cancelled:

@@ -57,6 +57,18 @@ struct MainTabView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: showsTabBar)
         .ignoresSafeArea(.keyboard)
+        .onChange(of: appState.pendingPushBookingId) { _, newVal in
+            guard newVal != nil else { return }
+            selectedTab = .alerts
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1.2))
+                appState.pendingPushBookingId = nil
+            }
+        }
+        .onChange(of: appState.pendingPushConversationId) { _, newVal in
+            guard newVal != nil else { return }
+            selectedTab = .chat
+        }
     }
 }
 

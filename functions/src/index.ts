@@ -1,66 +1,47 @@
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
+import {
+  BLOCKING_CREATE,
+  STATUS,
+  canTransition,
+  connectionStatusForTransition,
+} from "./bookingRules";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-/** Matches `Booking.BookingStatus` raw values in the iOS client. */
-const STATUS = {
-  awaitingCaregiver: "Awaiting caregiver",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  inProgress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-} as const;
-
-const BLOCKING_CREATE = new Set<string>([
-  STATUS.awaitingCaregiver,
-  STATUS.pending,
-  STATUS.confirmed,
-  STATUS.inProgress,
-]);
-
-function canTransition(
-  role: "patient" | "caregiver",
-  from: string,
-  to: string
-): boolean {
-  if (from === to) return false;
-  if (role === "patient") {
-    const ok: [string, string][] = [
-      [STATUS.awaitingCaregiver, STATUS.cancelled],
-      [STATUS.pending, STATUS.cancelled],
-      [STATUS.confirmed, STATUS.cancelled],
-      [STATUS.inProgress, STATUS.cancelled],
-    ];
-    return ok.some(([a, b]) => a === from && b === to);
+function timestampFromUnknown(raw: unknown): admin.firestore.Timestamp | null {
+  if (raw instanceof admin.firestore.Timestamp) return raw;
+  if (raw instanceof Date) return admin.firestore.Timestamp.fromDate(raw);
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return admin.firestore.Timestamp.fromMillis(raw);
   }
-  const ok: [string, string][] = [
-    [STATUS.awaitingCaregiver, STATUS.confirmed],
-    [STATUS.pending, STATUS.confirmed],
-    [STATUS.awaitingCaregiver, STATUS.cancelled],
-    [STATUS.pending, STATUS.cancelled],
-    [STATUS.confirmed, STATUS.inProgress],
-    [STATUS.confirmed, STATUS.completed],
-    [STATUS.inProgress, STATUS.completed],
-  ];
-  return ok.some(([a, b]) => a === from && b === to);
-}
-
-function connectionStatusForTransition(
-  role: "patient" | "caregiver",
-  from: string,
-  to: string
-): "pending" | "approved" | "rejected" | null {
-  if (to === STATUS.confirmed && role === "caregiver") {
-    if (from === STATUS.awaitingCaregiver || from === STATUS.pending) return "approved";
-  }
-  if (to === STATUS.cancelled && from !== STATUS.completed) {
-    return "rejected";
+  if (typeof raw === "string") {
+    const asNumber = Number(raw);
+    if (Number.isFinite(asNumber)) {
+      return admin.firestore.Timestamp.fromMillis(asNumber);
+    }
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) {
+      return admin.firestore.Timestamp.fromMillis(parsed);
+    }
   }
   return null;
+}
+
+function normalizeBookingPayloadForFirestore(
+  booking: Record<string, unknown>
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...booking };
+  const dateKeys = ["date", "startTime", "endTime", "createdAt", "cancellationRequestedAt"];
+  for (const key of dateKeys) {
+    if (!(key in normalized)) continue;
+    const ts = timestampFromUnknown(normalized[key]);
+    if (ts) normalized[key] = ts;
+    else delete normalized[key];
+  }
+  return normalized;
 }
 
 async function writeAudit(entry: Record<string, unknown>) {
@@ -102,7 +83,8 @@ export const createBookingRequest = onCall(async (request) => {
         "You already have an active booking request."
       );
     }
-    tx.set(db.collection("bookings").doc(bookingId), booking);
+    const normalizedBooking = normalizeBookingPayloadForFirestore(booking);
+    tx.set(db.collection("bookings").doc(bookingId), normalizedBooking);
   });
 
   await writeAudit({
@@ -169,7 +151,7 @@ export const updateBookingStatus = onCall(async (request) => {
     bookingId,
     fromStatus: result.fromStatus,
     toStatus: newStatus,
-    actorUid: request.auth!.uid,
+    actorUid: request.auth.uid,
     role: result.role,
   });
 

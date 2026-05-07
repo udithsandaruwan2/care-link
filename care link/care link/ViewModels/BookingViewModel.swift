@@ -137,7 +137,7 @@ final class BookingViewModel {
             try? await firestoreService.createNotification(
                 CLNotification(
                     id: UUID().uuidString,
-                    userId: caregiver.id,
+                    userId: caregiver.userId,
                     senderUserId: userId,
                     title: "New booking request",
                     message: "\(patientName) requested care on \(booking.date.formatted(date: .abbreviated, time: .omitted)).",

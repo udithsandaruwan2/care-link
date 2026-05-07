@@ -15,6 +15,7 @@ struct ChatListView: View {
                     Text("Messages")
                         .font(CLTheme.titleFont)
                         .foregroundStyle(CLTheme.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
                 }
                 .padding(.horizontal, CLTheme.spacingMD)
@@ -26,11 +27,14 @@ struct ChatListView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(appState.chatService.conversations) { conversation in
-                                conversationRow(conversation)
-                                    .onTapGesture {
-                                        selectedConversation = conversation
-                                        showChat = true
-                                    }
+                                Button {
+                                    selectedConversation = conversation
+                                    showChat = true
+                                } label: {
+                                    conversationRow(conversation)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(String(localized: "Opens this conversation"))
                             }
                         }
                         .padding(.bottom, 100)
@@ -55,6 +59,14 @@ struct ChatListView: View {
                 }
             }
             .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
+            .onChange(of: appState.pendingPushConversationId) { _, id in
+                guard let id, !id.isEmpty else { return }
+                if let conv = appState.chatService.conversations.first(where: { $0.id == id }) {
+                    selectedConversation = conv
+                    showChat = true
+                }
+                appState.pendingPushConversationId = nil
+            }
         }
     }
 
@@ -65,8 +77,18 @@ struct ChatListView: View {
     private func conversationRow(_ conversation: ChatConversation) -> some View {
         let isUser = appState.currentUserRole == .user
         let displayName = isUser ? conversation.caregiverName : conversation.userName
-        let subtitle = isUser ? conversation.caregiverSpecialty : "Patient"
         let unread = isUser ? conversation.unreadCountUser : conversation.unreadCountCaregiver
+        let preview = conversation.lastMessage.isEmpty
+            ? String(localized: "No messages yet")
+            : conversation.lastMessage
+        let relativeTime: String = {
+            let f = RelativeDateTimeFormatter()
+            f.unitsStyle = .abbreviated
+            return f.localizedString(for: conversation.lastMessageAt, relativeTo: Date())
+        }()
+        let unreadSummary = unread > 0
+            ? String(format: String(localized: "%lld unread"), locale: .current, unread)
+            : String(localized: "No unread messages")
 
         return HStack(spacing: CLTheme.spacingMD) {
             ZStack(alignment: .bottomTrailing) {
@@ -91,6 +113,7 @@ struct ChatListView: View {
                         .offset(x: 2, y: 2)
                 }
             }
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -113,6 +136,17 @@ struct ChatListView: View {
         .padding(.horizontal, CLTheme.spacingMD)
         .padding(.vertical, CLTheme.spacingSM)
         .background(unread > 0 ? CLTheme.lightBlue.opacity(0.3) : CLTheme.cardBackground)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            String(
+                format: String(localized: "%1$@. %2$@. %3$@. %4$@"),
+                locale: .current,
+                displayName,
+                relativeTime,
+                preview,
+                unreadSummary
+            )
+        )
     }
 
     private var emptyState: some View {

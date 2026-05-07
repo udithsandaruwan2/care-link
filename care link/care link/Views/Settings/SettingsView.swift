@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import UIKit
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
@@ -7,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("carelink.darkModeEnabled") private var darkModeEnabled = false
     @AppStorage("carelink.pushNotificationsEnabled") private var pushNotificationsEnabled = false
     @AppStorage("carelink.healthKitSyncEnabled") private var healthKitSyncEnabled = false
+    @AppStorage("carelink.highContrastMode") private var highContrastMode = false
+    @AppStorage("carelink.colorBlindMode") private var colorBlindMode = "off"
     @State private var biometricEnabled = false
     @State private var isSyncingBiometricToggle = false
     @State private var didInitializeBiometricToggle = false
@@ -17,6 +20,7 @@ struct SettingsView: View {
     @State private var showSignOutConfirmation = false
     @State private var showClearDataConfirmation = false
     @State private var showSupportCenter = false
+    @State private var showLearningCenter = false
     @State private var showPrivacyPolicy = false
     @State private var isConnectingHealth = false
 
@@ -28,11 +32,17 @@ struct SettingsView: View {
                 Section {
                     settingsRow(icon: "bell.fill", title: "Push Notifications", color: CLTheme.accentBlue) {
                         Toggle("", isOn: $pushNotificationsEnabled)
+                            .labelsHidden()
+                            .accessibilityLabel(String(localized: "Push notifications"))
+                            .accessibilityHint(String(localized: "Turns booking and message alerts on or off"))
                             .tint(CLTheme.accentBlue)
                     }
 
                     settingsRow(icon: "faceid", title: "Biometric Login", color: CLTheme.tealAccent) {
                         Toggle("", isOn: $biometricEnabled)
+                            .labelsHidden()
+                            .accessibilityLabel(String(localized: "Biometric login"))
+                            .accessibilityHint(String(localized: "Uses Face ID or Touch ID to unlock the app"))
                             .tint(CLTheme.tealAccent)
                             .disabled(!appState.biometricService.isAvailable)
                     }
@@ -42,22 +52,12 @@ struct SettingsView: View {
                     Text("Push notifications use Apple’s permission dialog the first time you turn them on. You can revoke access anytime in the iOS Settings app. After you sign in once and tap Enable for biometric login, CareLink can unlock with Face ID or Touch ID each time you open the app. Turn off biometric to remove saved sign-in.")
                 }
 
-                Section {
-                    settingsRow(icon: "textformat.size", title: "Font Size", color: CLTheme.warningOrange) {
-                        Slider(value: $fontSize, in: 12...24, step: 1)
-                            .frame(width: 120)
-                            .tint(CLTheme.accentBlue)
-                    }
-
-                    settingsRow(icon: "moon.fill", title: "Dark Mode", color: CLTheme.primaryNavy) {
-                        Toggle("", isOn: $darkModeEnabled)
-                            .tint(CLTheme.primaryNavy)
-                    }
-                } header: {
-                    Text("Accessibility")
-                } footer: {
-                    Text("Dark appearance is stored on this device only.")
-                }
+                AccessibilitySettingsSection(
+                    fontSize: $fontSize,
+                    darkModeEnabled: $darkModeEnabled,
+                    highContrastMode: $highContrastMode,
+                    colorBlindMode: $colorBlindMode
+                )
 
                 Section {
                     settingsRow(icon: "applewatch", title: "Health Device Sync", color: CLTheme.tealAccent) {
@@ -104,6 +104,17 @@ struct SettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(CLTheme.textTertiary)
                     }
+
+                    Button {
+                        showLearningCenter = true
+                    } label: {
+                        settingsRow(icon: "graduationcap.fill", title: "Learning Center", color: CLTheme.warningOrange) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundStyle(CLTheme.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
 
                     Button {
                         showPrivacyPolicy = true
@@ -195,6 +206,9 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $showSupportCenter) {
                 SupportCenterView()
             }
+            .navigationDestination(isPresented: $showLearningCenter) {
+                LearningCenterView()
+            }
             .navigationDestination(isPresented: $showPrivacyPolicy) {
                 PrivacyPolicyView()
             }
@@ -202,6 +216,8 @@ struct SettingsView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundStyle(CLTheme.accentBlue)
+                        .accessibilityHint(String(localized: "Closes settings"))
+                        .careLinkMinimumTapTarget(44)
                 }
             }
             .alert("Sign Out", isPresented: $showSignOutConfirmation) {
@@ -389,6 +405,102 @@ struct SettingsView: View {
 
         await appState.healthKitService.refreshMetrics()
         healthKitSyncEnabled = appState.healthKitService.isAuthorized
+    }
+
+}
+
+private struct AccessibilitySettingsSection: View {
+    @Binding var fontSize: Double
+    @Binding var darkModeEnabled: Bool
+    @Binding var highContrastMode: Bool
+    @Binding var colorBlindMode: String
+    @State private var showAccessibilityHelpAlert = false
+
+    var body: some View {
+        Section {
+            row(icon: "textformat.size", title: "Font Size", color: CLTheme.warningOrange) {
+                Slider(value: $fontSize, in: 12...24, step: 1)
+                    .frame(width: 120)
+                    .tint(CLTheme.accentBlue)
+                    .accessibilityLabel(String(localized: "Font size preview"))
+                    .accessibilityHint(String(localized: "Adjusts demo font size in this settings screen only"))
+            }
+
+            row(icon: "moon.fill", title: "Dark Mode", color: CLTheme.primaryNavy) {
+                Toggle("", isOn: $darkModeEnabled)
+                    .labelsHidden()
+                    .accessibilityLabel(String(localized: "Dark mode"))
+                    .accessibilityHint(String(localized: "Uses a dark color scheme in the app"))
+                    .tint(CLTheme.primaryNavy)
+            }
+
+            row(icon: "circle.lefthalf.filled", title: "High Contrast", color: CLTheme.primaryNavy) {
+                Toggle("", isOn: $highContrastMode)
+                    .labelsHidden()
+                    .accessibilityLabel(String(localized: "High contrast mode"))
+                    .accessibilityHint(String(localized: "Increases visual contrast for text and controls"))
+                    .tint(CLTheme.primaryNavy)
+            }
+
+            row(icon: "eyedropper.halffull", title: "Color Blind Mode", color: CLTheme.accentBlue) {
+                Picker("Color Blind Mode", selection: $colorBlindMode) {
+                    Text("Off").tag("off")
+                    Text("Protanopia").tag("protanopia")
+                    Text("Deuteranopia").tag("deuteranopia")
+                    Text("Tritanopia").tag("tritanopia")
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel(String(localized: "Color blind mode"))
+                .accessibilityHint(String(localized: "Adjusts app colors for common color vision deficiencies"))
+            }
+
+            Button {
+                showAccessibilityHelpAlert = true
+            } label: {
+                row(icon: "speaker.wave.2.fill", title: "How to enable VoiceOver", color: CLTheme.tealAccent) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(CLTheme.textTertiary)
+                }
+            }
+            .buttonStyle(.plain)
+        } header: {
+            Text("Accessibility")
+        } footer: {
+            Text("These accessibility preferences apply on this device for both patient and caregiver accounts.")
+        }
+        .alert("Enable VoiceOver", isPresented: $showAccessibilityHelpAlert) {
+            Button("Open iOS Settings") {
+                guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                UIApplication.shared.open(url)
+            }
+            Button("Close", role: .cancel) {}
+        } message: {
+            Text("On iPhone: Settings > Accessibility > VoiceOver. Turn VoiceOver on, then use the same gesture navigation inside CareLink.")
+        }
+    }
+
+    private func row<Accessory: View>(
+        icon: String,
+        title: String,
+        color: Color,
+        @ViewBuilder accessory: () -> Accessory
+    ) -> some View {
+        HStack(spacing: CLTheme.spacingMD) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(color)
+                .frame(width: 30, height: 30)
+                .background(color.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusSM, style: .continuous))
+
+            Text(title)
+                .font(CLTheme.bodyFont)
+                .foregroundStyle(CLTheme.textPrimary)
+
+            Spacer()
+            accessory()
+        }
     }
 }
 

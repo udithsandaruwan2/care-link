@@ -39,6 +39,8 @@ struct CLInfoCard: View {
         .background(CLTheme.cardBackground)
         .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
         .shadow(color: CLTheme.shadowLight, radius: 6, x: 0, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label), \(value)")
     }
 }
 
@@ -61,6 +63,8 @@ struct CLStatBadge: View {
                 .tracking(0.5)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label), \(value)")
     }
 }
 

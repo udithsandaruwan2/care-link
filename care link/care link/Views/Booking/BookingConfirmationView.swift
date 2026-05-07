@@ -3,6 +3,7 @@ import SwiftUI
 struct BookingConfirmationView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let booking: Booking
     let caregiver: Caregiver
     @State private var addedToCalendar = false
@@ -19,13 +20,14 @@ struct BookingConfirmationView: View {
                         Circle()
                             .fill(CLTheme.successGreen.opacity(0.15))
                             .frame(width: 90, height: 90)
-                            .scaleEffect(animate ? 1.0 : 0.5)
+                            .scaleEffect(reduceMotion ? 1.0 : (animate ? 1.0 : 0.5))
 
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 56))
                             .foregroundStyle(CLTheme.successGreen)
-                            .scaleEffect(animate ? 1.0 : 0.3)
+                            .scaleEffect(reduceMotion ? 1.0 : (animate ? 1.0 : 0.3))
                     }
+                    .accessibilityHidden(true)
 
                     Text("Booking request sent")
                         .font(CLTheme.titleFont)
@@ -47,7 +49,12 @@ struct BookingConfirmationView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         HStack(spacing: CLTheme.spacingMD) {
-                            CaregiverAvatar(size: 50, showVerified: caregiver.isVerified)
+                            CaregiverAvatar(
+                                size: 50,
+                                imageURL: caregiver.imageURL,
+                                showVerified: caregiver.isVerified,
+                                accessibilityName: caregiver.name
+                            )
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(caregiver.name), \(caregiver.title)")
@@ -145,17 +152,30 @@ struct BookingConfirmationView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
                 VStack(spacing: CLTheme.spacingMD) {
-                    CLButton(title: "Add to Calendar", icon: "calendar.badge.plus", style: addedToCalendar ? .secondary : .primary) {
+                    CLButton(
+                        title: "Add to Calendar",
+                        icon: "calendar.badge.plus",
+                        style: addedToCalendar ? .secondary : .primary,
+                        accessibilityHintText: String(localized: "Creates a calendar event for this booking")
+                    ) {
                         Task {
                             addedToCalendar = await appState.eventKitService.addBookingToCalendar(booking: booking)
                         }
                     }
 
-                    CLButton(title: "View Booking Details", style: .primary) {
+                    CLButton(
+                        title: "View Booking Details",
+                        style: .primary,
+                        accessibilityHintText: String(localized: "Shows full booking summary")
+                    ) {
                         showBookingSummary = true
                     }
 
-                    CLButton(title: "Back to Home", style: .secondary) {
+                    CLButton(
+                        title: "Back to Home",
+                        style: .secondary,
+                        accessibilityHintText: String(localized: "Leaves this screen and returns to home")
+                    ) {
                         navigateToHome()
                     }
                 }
@@ -172,8 +192,12 @@ struct BookingConfirmationView: View {
         .background(CLTheme.backgroundPrimary)
         .navigationBarBackButtonHidden()
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+            if reduceMotion {
                 animate = true
+            } else {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.6)) {
+                    animate = true
+                }
             }
         }
         .sheet(isPresented: $showBookingSummary) {

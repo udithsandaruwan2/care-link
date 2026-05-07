@@ -35,6 +35,17 @@ enum CLTab: String, CaseIterable {
             return [.home, .chat, .alerts, .profile]
         }
     }
+
+    /// VoiceOver label (human-readable, not raw enum string).
+    var voiceOverLabel: String {
+        switch self {
+        case .home: return String(localized: "Home")
+        case .chat: return String(localized: "Chat")
+        case .map: return String(localized: "Map")
+        case .alerts: return String(localized: "Notifications")
+        case .profile: return String(localized: "Profile")
+        }
+    }
 }
 
 struct CLTabBar: View {
@@ -42,6 +53,7 @@ struct CLTabBar: View {
     var badgeCount: Int = 0
     var chatBadgeCount: Int = 0
     var role: CLUser.UserRole = .user
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tabs: [CLTab] {
         CLTab.tabsForRole(role)
@@ -69,34 +81,62 @@ struct CLTabBar: View {
 
     private func tabButton(_ tab: CLTab) -> some View {
         Button {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+            if reduceMotion {
                 selectedTab = tab
+            } else {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                    selectedTab = tab
+                }
             }
         } label: {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: selectedTab == tab ? tab.selectedIcon : tab.icon)
-                        .font(.system(size: 22))
-                        .symbolEffect(.bounce, value: selectedTab == tab)
+                    Group {
+                        if reduceMotion {
+                            Image(systemName: selectedTab == tab ? tab.selectedIcon : tab.icon)
+                                .font(.system(size: 22))
+                        } else {
+                            Image(systemName: selectedTab == tab ? tab.selectedIcon : tab.icon)
+                                .font(.system(size: 22))
+                                .careLinkSymbolBounceIfAllowed(value: selectedTab == tab)
+                        }
+                    }
 
                     if tab == .alerts && badgeCount > 0 {
                         badgeDot
+                            .accessibilityHidden(true)
                     }
                     if tab == .chat && chatBadgeCount > 0 {
                         badgeDot
+                            .accessibilityHidden(true)
                     }
                 }
 
                 Text(tab.rawValue)
                     .font(.system(size: 9, weight: selectedTab == tab ? .bold : .medium))
                     .tracking(0.3)
+                    .accessibilityHidden(true)
             }
             .foregroundStyle(selectedTab == tab ? CLTheme.primaryNavy : CLTheme.textTertiary)
-            .frame(minWidth: 52)
+            .frame(minWidth: 52, minHeight: 44)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tab.voiceOverLabel)
+        .accessibilityAddTraits(selectedTab == tab ? [.isButton, .isSelected] : .isButton)
+        .careLinkAccessibilityHint(tabAccessibilityHint(tab: tab))
+    }
+
+    private func tabAccessibilityHint(tab: CLTab) -> String? {
+        switch tab {
+        case .alerts where badgeCount > 0:
+            return String(localized: "\(badgeCount) unread notifications")
+        case .chat where chatBadgeCount > 0:
+            return String(localized: "\(chatBadgeCount) conversations with unread messages")
+        default:
+            return nil
+        }
     }
 
     private var badgeDot: some View {

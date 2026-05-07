@@ -18,6 +18,7 @@ struct BookingsListView: View {
                 Text("My Bookings")
                     .font(CLTheme.titleFont)
                     .foregroundStyle(CLTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
             }
             .padding(.horizontal, CLTheme.spacingMD)
@@ -73,7 +74,10 @@ struct BookingsListView: View {
         CLCard {
             VStack(spacing: CLTheme.spacingMD) {
                 HStack(spacing: CLTheme.spacingMD) {
-                    CaregiverAvatar(size: 50)
+                    CaregiverAvatar(
+                        size: 50,
+                        accessibilityName: booking.caregiverName
+                    )
 
                     VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
                         Text(booking.caregiverName)
@@ -94,6 +98,7 @@ struct BookingsListView: View {
                         .background(Color(hex: booking.status.color))
                         .clipShape(Capsule())
                 }
+                .accessibilityElement(children: .combine)
 
                 Divider()
 

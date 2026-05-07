@@ -15,7 +15,11 @@ struct PaymentMethodsView: View {
                     cardView(card)
                 }
                 historyBlock
-                CLButton(title: "Add New Card", icon: "plus.circle") {
+                CLButton(
+                    title: "Add New Card",
+                    icon: "plus.circle",
+                    accessibilityHintText: String(localized: "Opens the form to save a demo payment card on this device")
+                ) {
                     showAddCard = true
                 }
                 .padding(.top, CLTheme.spacingSM)
@@ -47,13 +51,13 @@ struct PaymentMethodsView: View {
 
     private var titleBlock: some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingSM) {
-            Text("Demo wallet")
+            Text("V1: on-device demo wallet")
                 .font(CLTheme.headlineFont)
                 .foregroundStyle(CLTheme.primaryNavy)
-            Text("Cards and balances stay on this device for development and demos. There is no live Stripe processing in this build.")
+            Text("CareLink v1 does not process real card payments. Saved cards exist only on this device for UI demos. Bookings may still record “Card” or “Cash” as the patient’s intent; settlement happens outside the app unless you integrate a processor later.")
                 .font(CLTheme.captionFont)
                 .foregroundStyle(CLTheme.textSecondary)
-            Text("Manage your saved payment methods below.")
+            Text("Manage demo cards below. Do not enter real card numbers you are not willing to store locally.")
                 .font(CLTheme.bodyFont)
                 .foregroundStyle(CLTheme.textSecondary)
         }
@@ -106,6 +110,13 @@ struct PaymentMethodsView: View {
                         .background(.white.opacity(0.18))
                         .clipShape(Capsule())
                 }
+                .accessibilityLabel(
+                    card.isPrimary
+                        ? String(localized: "Primary card")
+                        : String(localized: "Set as primary card")
+                )
+                .accessibilityHint(String(localized: "Uses this card as the default for bookings"))
+                .careLinkMinimumTapTarget(44)
             }
         }
         .padding(CLTheme.spacingMD)

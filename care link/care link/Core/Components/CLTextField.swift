@@ -8,8 +8,14 @@ struct CLTextField: View {
     var trailingText: String? = nil
     var trailingAction: (() -> Void)? = nil
     var keyboardType: UIKeyboardType = .default
+    /// VoiceOver field name; defaults to `placeholder` when nil.
+    var accessibilityFieldLabel: String? = nil
 
     @State private var isPasswordVisible = false
+
+    private var fieldAccessibilityLabel: String {
+        accessibilityFieldLabel ?? placeholder
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
@@ -19,17 +25,20 @@ struct CLTextField: View {
                         .font(.system(size: 16))
                         .foregroundStyle(CLTheme.textTertiary)
                         .frame(width: 24)
+                        .accessibilityHidden(true)
                 }
 
                 if isSecure && !isPasswordVisible {
                     SecureField(placeholder, text: $text)
                         .font(CLTheme.bodyFont)
+                        .accessibilityLabel(fieldAccessibilityLabel)
                 } else {
                     TextField(placeholder, text: $text)
                         .font(CLTheme.bodyFont)
                         .keyboardType(keyboardType)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .accessibilityLabel(fieldAccessibilityLabel)
                 }
 
                 if isSecure {
@@ -39,7 +48,10 @@ struct CLTextField: View {
                         Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
                             .font(.system(size: 14))
                             .foregroundStyle(CLTheme.textTertiary)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel(isPasswordVisible ? String(localized: "Hide password") : String(localized: "Show password"))
                 }
 
                 if let trailingText {
@@ -49,11 +61,15 @@ struct CLTextField: View {
                         Text(trailingText)
                             .font(CLTheme.calloutFont)
                             .foregroundStyle(CLTheme.accentBlue)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel(trailingText)
+                    .accessibilityAddTraits(.isButton)
                 }
             }
             .padding(.horizontal, CLTheme.spacingMD)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .background(CLTheme.backgroundSecondary)
             .clipShape(Capsule())
             .overlay {

@@ -325,7 +325,12 @@ struct CaregiverMapView: View {
                 }
 
                 HStack(spacing: CLTheme.spacingMD) {
-                    CaregiverAvatar(size: 65, imageURL: caregiver.imageURL, showVerified: caregiver.isVerified)
+                    CaregiverAvatar(
+                        size: 65,
+                        imageURL: caregiver.imageURL,
+                        showVerified: caregiver.isVerified,
+                        accessibilityName: caregiver.name
+                    )
 
                     VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
                         HStack {

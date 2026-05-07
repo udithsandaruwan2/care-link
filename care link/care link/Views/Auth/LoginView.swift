@@ -5,6 +5,7 @@ import GoogleSignIn
 
 struct LoginView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var viewModel = AuthViewModel()
     @State private var showResetAlert = false
     @State private var resetSent = false
@@ -80,6 +81,7 @@ struct LoginView: View {
                             Image(systemName: "person.crop.circle.badge.checkmark")
                                 .font(.system(size: 28))
                                 .foregroundStyle(CLTheme.tealAccent)
+                                .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Account saved on this device")
                                     .font(CLTheme.calloutFont.weight(.semibold))
@@ -109,7 +111,8 @@ struct LoginView: View {
                 CLButton(
                     title: "Log in with \(appState.biometricService.unlockButtonLabel)",
                     icon: appState.biometricService.biometricIcon,
-                    isLoading: viewModel.isLoading
+                    isLoading: viewModel.isLoading,
+                    accessibilityHintText: String(localized: "Uses saved account credentials on this device")
                 ) {
                     Task { await performBiometricSignIn() }
                 }
@@ -133,7 +136,9 @@ struct LoginView: View {
                 Image(systemName: "cross.fill")
                     .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(CLTheme.primaryNavy)
+                    .accessibilityHidden(true)
             }
+            .accessibilityHidden(true)
 
             Text("CareLink")
                 .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -143,6 +148,7 @@ struct LoginView: View {
                 .font(CLTheme.bodyFont)
                 .foregroundStyle(CLTheme.textSecondary)
         }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Form
@@ -160,6 +166,7 @@ struct LoginView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(CLTheme.textTertiary)
                         .frame(width: 24)
+                        .accessibilityHidden(true)
 
                     TextField("your@email.com", text: $viewModel.email)
                         .font(CLTheme.bodyFont)
@@ -179,6 +186,7 @@ struct LoginView: View {
                     Capsule()
                         .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
                 }
+                .accessibilityElement(children: .combine)
             }
 
             VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
@@ -192,6 +200,7 @@ struct LoginView: View {
                         .font(.system(size: 16))
                         .foregroundStyle(CLTheme.textTertiary)
                         .frame(width: 24)
+                        .accessibilityHidden(true)
 
                     SecureField("Enter password", text: $viewModel.password)
                         .font(CLTheme.bodyFont)
@@ -214,6 +223,7 @@ struct LoginView: View {
                     Capsule()
                         .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
                 }
+                .accessibilityElement(children: .combine)
             }
 
             if viewModel.isSignUpMode {
@@ -228,6 +238,7 @@ struct LoginView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(CLTheme.textTertiary)
                             .frame(width: 24)
+                            .accessibilityHidden(true)
 
                         SecureField("Re-enter password", text: $viewModel.confirmPassword)
                             .font(CLTheme.bodyFont)
@@ -244,6 +255,7 @@ struct LoginView: View {
                         Capsule()
                             .stroke(CLTheme.divider.opacity(0.6), lineWidth: 1)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
 
@@ -258,11 +270,13 @@ struct LoginView: View {
                     }
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(CLTheme.accentBlue)
+                    .accessibilityHint(String(localized: "Sends a password reset email to the address you entered"))
+                    .careLinkMinimumTapTarget(44)
                 }
             }
         }
         .padding(.horizontal, CLTheme.spacingLG)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.isSignUpMode)
+        .animation(reduceMotion ? .none : .easeInOut(duration: 0.25), value: viewModel.isSignUpMode)
     }
 
     // MARK: - Action Buttons
@@ -271,7 +285,10 @@ struct LoginView: View {
         CLButton(
             title: viewModel.isSignUpMode ? "Create Account" : "Sign In",
             icon: viewModel.isSignUpMode ? "person.badge.plus" : "arrow.right",
-            isLoading: viewModel.isLoading
+            isLoading: viewModel.isLoading,
+            accessibilityHintText: viewModel.isSignUpMode
+                ? String(localized: "Creates a new CareLink account with your email and password")
+                : String(localized: "Signs in with your email and password")
         ) {
             if viewModel.isSignUpMode {
                 performSignUp()
@@ -322,6 +339,8 @@ struct LoginView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: "Continue with Google"))
+        .accessibilityHint(String(localized: "Opens the Google sign-in flow"))
         .padding(.horizontal, CLTheme.spacingLG)
     }
 
@@ -333,15 +352,27 @@ struct LoginView: View {
                 .font(CLTheme.bodyFont)
                 .foregroundStyle(CLTheme.textSecondary)
             Button(viewModel.isSignUpMode ? "Sign In" : "Sign Up") {
-                withAnimation {
+                if reduceMotion {
                     viewModel.isSignUpMode.toggle()
                     viewModel.confirmPassword = ""
+                } else {
+                    withAnimation {
+                        viewModel.isSignUpMode.toggle()
+                        viewModel.confirmPassword = ""
+                    }
                 }
             }
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(CLTheme.accentBlue)
+            .accessibilityHint(
+                viewModel.isSignUpMode
+                    ? String(localized: "Switches to email sign-in for an existing account")
+                    : String(localized: "Switches to create a new account")
+            )
+            .careLinkMinimumTapTarget(44)
         }
         .padding(.top, CLTheme.spacingSM)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Actions

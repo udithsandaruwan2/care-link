@@ -6,6 +6,10 @@ struct CLButton: View {
     var style: ButtonStyle = .primary
     var isFullWidth: Bool = true
     var isLoading: Bool = false
+    /// VoiceOver hint beyond the title (optional).
+    var accessibilityHintText: String? = nil
+    /// If non-nil, overrides default VoiceOver label (defaults to `title`).
+    var accessibilityLabelOverride: String? = nil
     let action: () -> Void
 
     enum ButtonStyle {
@@ -55,6 +59,11 @@ struct CLButton: View {
         }
         .buttonStyle(CLPressableButtonStyle())
         .disabled(isLoading)
+        .accessibilityLabel(accessibilityLabelOverride ?? title)
+        .careLinkAccessibilityHint(accessibilityHintText)
+        .careLinkAccessibilityValue(isLoading ? String(localized: "Loading") : nil)
+        .accessibilityAddTraits(.isButton)
+        .careLinkMinimumTapTarget(usesTallChrome ? 56 : 44)
     }
 
     @ViewBuilder
@@ -86,11 +95,19 @@ struct CLButton: View {
 }
 
 private struct CLPressableButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+        Group {
+            if reduceMotion {
+                configuration.label
+            } else {
+                configuration.label
+                    .scaleEffect(configuration.isPressed ? 0.98 : 1)
+                    .opacity(configuration.isPressed ? 0.9 : 1)
+                    .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            }
+        }
     }
 }
 

@@ -19,6 +19,43 @@ service cloud.firestore {
         (conv.data.userId == request.auth.uid || conv.data.caregiverId == request.auth.uid);
     }
 
+    function isValidBookingStatus(status) {
+      return status == "Awaiting caregiver" ||
+        status == "Pending" ||
+        status == "Confirmed" ||
+        status == "In Progress" ||
+        status == "Completed" ||
+        status == "Cancelled";
+    }
+
+    function isAllowedBookingTransition() {
+      let from = resource.data.status;
+      let to = request.resource.data.status;
+      let isPatient = resource.data.userId == request.auth.uid;
+      let isCaregiver = resource.data.caregiverId == request.auth.uid;
+      return isValidBookingStatus(to) && (
+        // patient transitions
+        (isPatient && (
+          (from == "Awaiting caregiver" && to == "Cancelled") ||
+          (from == "Pending" && to == "Cancelled") ||
+          (from == "Confirmed" && to == "Cancelled") ||
+          (from == "In Progress" && to == "Cancelled")
+        )) ||
+        // caregiver transitions
+        (isCaregiver && (
+          (from == "Awaiting caregiver" && to == "Confirmed") ||
+          (from == "Pending" && to == "Confirmed") ||
+          (from == "Awaiting caregiver" && to == "Cancelled") ||
+          (from == "Pending" && to == "Cancelled") ||
+          (from == "Confirmed" && to == "Cancelled") ||
+          (from == "In Progress" && to == "Cancelled") ||
+          (from == "Confirmed" && to == "In Progress") ||
+          (from == "Confirmed" && to == "Completed") ||
+          (from == "In Progress" && to == "Completed")
+        ))
+      );
+    }
+
     match /users/{userId} {
       allow read: if isUser(userId);
       allow create: if isUser(userId) && request.resource.data.id == userId;
@@ -45,12 +82,24 @@ service cloud.firestore {
       allow read: if signedIn() &&
         (resource.data.userId == request.auth.uid || resource.data.caregiverId == request.auth.uid);
 
+      // Emergency fallback: allow client creates when callables are unavailable.
       allow create: if signedIn() &&
-        request.resource.data.userId == request.auth.uid;
+        request.resource.data.userId == request.auth.uid &&
+        (request.resource.data.status == "Awaiting caregiver" ||
+         request.resource.data.status == "Pending");
 
+      // Allow participant status + cancellation metadata updates.
       allow update: if signedIn() && (
-        (resource.data.userId == request.auth.uid && onlyKeysChanged(["status", "cancellationRequestedByUid", "cancellationRequestedByRole", "cancellationRequestedAt"])) ||
-        (resource.data.caregiverId == request.auth.uid && onlyKeysChanged(["status", "cancellationRequestedByUid", "cancellationRequestedByRole", "cancellationRequestedAt"]))
+        (resource.data.userId == request.auth.uid || resource.data.caregiverId == request.auth.uid)
+      ) &&
+      resource.data.userId == request.resource.data.userId &&
+      resource.data.caregiverId == request.resource.data.caregiverId &&
+      onlyKeysChanged(["status", "cancellationRequestedByUid", "cancellationRequestedByRole", "cancellationRequestedAt"]) &&
+      (
+        // cancellation metadata only update
+        request.resource.data.status == resource.data.status ||
+        // status changed: enforce role-based transition matrix
+        isAllowedBookingTransition()
       );
 
       allow delete: if false;
@@ -110,18 +159,45 @@ service cloud.firestore {
       allow update, delete: if signedIn() && resource.data.ownerUserId == request.auth.uid;
     }
 
+    function isMedicalRecordPatientOwner() {
+      let pid = resource.data.patientId;
+      return signedIn() && pid == request.auth.uid;
+    }
+
+    function isMedicalRecordFamilyMemberOwner() {
+      let pid = resource.data.patientId;
+      return signedIn() &&
+        exists(/databases/$(database)/documents/familyMembers/$(pid)) &&
+        get(/databases/$(database)/documents/familyMembers/$(pid)).data.ownerUserId == request.auth.uid;
+    }
+
+    function requestMedicalRecordPatientOwner() {
+      let pid = request.resource.data.patientId;
+      return signedIn() && pid == request.auth.uid;
+    }
+
+    function requestMedicalRecordFamilyMemberOwner() {
+      let pid = request.resource.data.patientId;
+      return signedIn() &&
+        exists(/databases/$(database)/documents/familyMembers/$(pid)) &&
+        get(/databases/$(database)/documents/familyMembers/$(pid)).data.ownerUserId == request.auth.uid;
+    }
+
     match /medicalRecords/{recordId} {
       allow read: if signedIn() && (
-        resource.data.patientId == request.auth.uid ||
+        isMedicalRecordPatientOwner() ||
+        isMedicalRecordFamilyMemberOwner() ||
         resource.data.caregiverId == request.auth.uid
       );
 
       allow create: if signedIn() &&
-        (request.resource.data.patientId == request.auth.uid ||
+        (requestMedicalRecordPatientOwner() ||
+         requestMedicalRecordFamilyMemberOwner() ||
          request.resource.data.caregiverId == request.auth.uid);
 
       allow update, delete: if signedIn() &&
-        (resource.data.patientId == request.auth.uid ||
+        (isMedicalRecordPatientOwner() ||
+         isMedicalRecordFamilyMemberOwner() ||
          resource.data.caregiverId == request.auth.uid);
     }
 

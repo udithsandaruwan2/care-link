@@ -13,11 +13,23 @@
 		337F59262F84F6B200AD285A /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = CA00A0052F84E9AD003A6435 /* FirebaseStorage */; };
 		337F59C12F851F9D00AD285A /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 337F59C02F851F9D00AD285A /* GoogleSignIn */; };
 		337F59C32F851F9D00AD285A /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 337F59C22F851F9D00AD285A /* GoogleSignInSwift */; };
+		A1B2C3D42F84F6B200AD285A /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = CA00A0072F84E9AD003A6435 /* FirebaseFunctions */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E0PRXY12F84E9AD003A6435 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 335177E72F84E9AD003A6435 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 335177EE2F84E9AD003A6435;
+			remoteInfo = "care link";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		3307E5032F9FA7010044A831 /* care link Watch App.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = "care link Watch App.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		335177EF2F84E9AD003A6435 /* care link.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "care link.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0PROD12F84E9AD003A6435 /* care linkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "care linkTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -44,6 +56,11 @@
 			path = "care link";
 			sourceTree = "<group>";
 		};
+		E0TEST12F84E9AD003A6435 /* care linkTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "care linkTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +81,14 @@
 				337F59C32F851F9D00AD285A /* GoogleSignInSwift in Frameworks */,
 				337F59242F84F6B200AD285A /* FirebaseFirestore in Frameworks */,
 				337F59232F84F6B200AD285A /* FirebaseAuth in Frameworks */,
+				A1B2C3D42F84F6B200AD285A /* FirebaseFunctions in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0FRM012F84E9AD003A6435 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				335177F12F84E9AD003A6435 /* care link */,
+				E0TEST12F84E9AD003A6435 /* care linkTests */,
 				3307E5042F9FA7010044A831 /* care link Watch App */,
 				335177F02F84E9AD003A6435 /* Products */,
 			);
@@ -83,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				335177EF2F84E9AD003A6435 /* care link.app */,
+				E0PROD12F84E9AD003A6435 /* care linkTests.xctest */,
 				3307E5032F9FA7010044A831 /* care link Watch App.appex */,
 			);
 			name = Products;
@@ -134,12 +161,36 @@
 				CA00A0032F84E9AD003A6435 /* FirebaseFirestore */,
 				CA00A0042F84E9AD003A6435 /* FirebaseMessaging */,
 				CA00A0052F84E9AD003A6435 /* FirebaseStorage */,
+				CA00A0072F84E9AD003A6435 /* FirebaseFunctions */,
 				337F59C02F851F9D00AD285A /* GoogleSignIn */,
 				337F59C22F851F9D00AD285A /* GoogleSignInSwift */,
 			);
 			productName = "care link";
 			productReference = 335177EF2F84E9AD003A6435 /* care link.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E0UNIT12F84E9AD003A6435 /* care linkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E0CFGL12F84E9AD003A6435 /* Build configuration list for PBXNativeTarget "care linkTests" */;
+			buildPhases = (
+				E0SRC012F84E9AD003A6435 /* Sources */,
+				E0FRM012F84E9AD003A6435 /* Frameworks */,
+				E0RES012F84E9AD003A6435 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				E0DEP012F84E9AD003A6435 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				E0TEST12F84E9AD003A6435 /* care linkTests */,
+			);
+			name = "care linkTests";
+			packageProductDependencies = (
+			);
+			productName = "care linkTests";
+			productReference = E0PROD12F84E9AD003A6435 /* care linkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -156,6 +207,10 @@
 					};
 					335177EE2F84E9AD003A6435 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					E0UNIT12F84E9AD003A6435 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 335177EE2F84E9AD003A6435;
 					};
 				};
 			};
@@ -178,6 +233,7 @@
 			projectRoot = "";
 			targets = (
 				335177EE2F84E9AD003A6435 /* care link */,
+				E0UNIT12F84E9AD003A6435 /* care linkTests */,
 				3307E5022F9FA7010044A831 /* care link Watch App */,
 			);
 		};
@@ -192,6 +248,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		335177ED2F84E9AD003A6435 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E0RES012F84E9AD003A6435 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -215,7 +278,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E0SRC012F84E9AD003A6435 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E0DEP012F84E9AD003A6435 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 335177EE2F84E9AD003A6435 /* care link */;
+			targetProxy = E0PRXY12F84E9AD003A6435 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3307E50C2F9FA7010044A831 /* Debug */ = {
@@ -471,6 +549,48 @@
 			};
 			name = Release;
 		};
+		E0CFGD12F84E9AD003A6435 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cobsccomp242p-27.care-linkTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/care link.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/care link";
+			};
+			name = Debug;
+		};
+		E0CFGR12F84E9AD003A6435 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "cobsccomp242p-27.care-linkTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/care link.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/care link";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -497,6 +617,15 @@
 			buildConfigurations = (
 				335177FB2F84E9AF003A6435 /* Debug */,
 				335177FC2F84E9AF003A6435 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E0CFGL12F84E9AD003A6435 /* Build configuration list for PBXNativeTarget "care linkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E0CFGD12F84E9AD003A6435 /* Debug */,
+				E0CFGR12F84E9AD003A6435 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -552,6 +681,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CA00A0012F84E9AD003A6435 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		CA00A0072F84E9AD003A6435 /* FirebaseFunctions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CA00A0012F84E9AD003A6435 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFunctions;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

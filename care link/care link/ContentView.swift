@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
@@ -57,6 +58,7 @@ struct ContentView: View {
                     .environment(appState)
                     .transition(.opacity)
                     .zIndex(1000)
+                    .accessibilitySortPriority(1000)
             }
         }
         .animation(.easeInOut(duration: 0.4), value: appState.isAuthenticated)
@@ -66,6 +68,9 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.4), value: appState.needsProfileSetup)
         .onAppear {
             appState.checkAuthState()
+        }
+        .onOpenURL { url in
+            _ = GIDSignIn.sharedInstance.handle(url)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .inactive || phase == .background {
