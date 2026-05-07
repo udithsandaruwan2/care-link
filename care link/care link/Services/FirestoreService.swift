@@ -13,7 +13,7 @@ struct CaregiverActivePatientSelection: Sendable {
 final class FirestoreService {
     private var db: Firestore { Firestore.firestore() }
     private var userBookingsListener: ListenerRegistration?
-    private var userNotificationsListener: ListenerRegistration?
+    private var userNotificationsListeners: [ListenerRegistration] = []
     private func isFunctionUnavailableError(_ error: Error) -> Bool {
         if error is BookingFunctionsError { return true }
         let ns = error as NSError
@@ -188,20 +188,38 @@ final class FirestoreService {
             return
         }
 
-        userNotificationsListener = db.collection("users")
-            .document(userId)
-            .collection("notifications")
-            .order(by: "createdAt", descending: true)
-            .addSnapshotListener { snapshot, _ in
-                guard let snapshot else { return }
-                let items = snapshot.documents.compactMap { try? $0.data(as: CLNotification.self) }
-                onUpdate(items)
+        Task {
+            let ids = (try? await caregiverIdentifiers(for: userId)) ?? [userId]
+            let syncQueue = DispatchQueue(label: "carelink.notifications.sync")
+            var bucketByUser: [String: [CLNotification]] = [:]
+
+            for id in ids {
+                let listener = db.collection("users")
+                    .document(id)
+                    .collection("notifications")
+                    .order(by: "createdAt", descending: true)
+                    .addSnapshotListener { snapshot, _ in
+                        let items = snapshot?.documents.compactMap { try? $0.data(as: CLNotification.self) } ?? []
+                        syncQueue.sync {
+                            bucketByUser[id] = items
+                            let merged = bucketByUser.values
+                                .flatMap { $0 }
+                                .reduce(into: [String: CLNotification]()) { partial, item in
+                                    partial[item.id] = item
+                                }
+                                .values
+                                .sorted { $0.createdAt > $1.createdAt }
+                            onUpdate(merged)
+                        }
+                    }
+                userNotificationsListeners.append(listener)
             }
+        }
     }
 
     func stopListeningToNotificationsForUser() {
-        userNotificationsListener?.remove()
-        userNotificationsListener = nil
+        userNotificationsListeners.forEach { $0.remove() }
+        userNotificationsListeners.removeAll()
     }
 
     func markNotificationRead(userId: String, notificationId: String) async throws {
@@ -227,14 +245,83 @@ final class FirestoreService {
     }
 
     func fetchCaregiverBookings(for caregiverId: String) async throws -> [Booking] {
-        let snapshot = try await db.collection("bookings")
-            .whereField("caregiverId", isEqualTo: caregiverId)
-            .order(by: "createdAt", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: Booking.self)
+        let identifiers = try await caregiverIdentifiers(for: caregiverId)
+        var mergedById: [String: Booking] = [:]
+        var caregiverNames: Set<String> = []
+        if let caregiverProfile = try? await fetchCaregiverByUserId(caregiverId),
+           !caregiverProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            caregiverNames.insert(caregiverProfile.name.trimmingCharacters(in: .whitespacesAndNewlines))
         }
+        if let profile = try? await fetchUser(caregiverId),
+           !profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            caregiverNames.insert(profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        for identifier in identifiers {
+            // Prefer indexed query path first.
+            if let snapshot = try? await db.collection("bookings")
+                .whereField("caregiverId", isEqualTo: identifier)
+                .order(by: "createdAt", descending: true)
+                .getDocuments() {
+                for document in snapshot.documents {
+                    if let booking = try? document.data(as: Booking.self) {
+                        mergedById[booking.id] = booking
+                    }
+                }
+                continue
+            }
+
+            // Fallback when the indexed query fails (e.g. missing composite index).
+            if let snapshot = try? await db.collection("bookings")
+                .whereField("caregiverId", isEqualTo: identifier)
+                .getDocuments() {
+                for document in snapshot.documents {
+                    if let booking = try? document.data(as: Booking.self) {
+                        mergedById[booking.id] = booking
+                    }
+                }
+            }
+        }
+        if mergedById.isEmpty {
+            for name in caregiverNames {
+                if let nameSnapshot = try? await db.collection("bookings")
+                    .whereField("caregiverName", isEqualTo: name)
+                    .order(by: "createdAt", descending: true)
+                    .getDocuments() {
+                    for document in nameSnapshot.documents {
+                        if let booking = try? document.data(as: Booking.self) {
+                            mergedById[booking.id] = booking
+                        }
+                    }
+                    continue
+                }
+                if let nameSnapshot = try? await db.collection("bookings")
+                    .whereField("caregiverName", isEqualTo: name)
+                    .getDocuments() {
+                    for document in nameSnapshot.documents {
+                        if let booking = try? document.data(as: Booking.self) {
+                            mergedById[booking.id] = booking
+                        }
+                    }
+                }
+            }
+        }
+        let normalizedNames = Set(caregiverNames.map { CaregiverIdentityMatcher.normalizedName($0) })
+        if mergedById.isEmpty {
+            // Final fallback for inconsistent legacy docs: fetch all and filter in memory.
+            let allSnapshot = try await db.collection("bookings").getDocuments()
+            for document in allSnapshot.documents {
+                guard let booking = try? document.data(as: Booking.self) else { continue }
+                if CaregiverIdentityMatcher.matches(
+                    caregiverId: booking.caregiverId,
+                    caregiverName: booking.caregiverName,
+                    knownIds: Set(identifiers),
+                    knownNames: normalizedNames
+                ) {
+                    mergedById[booking.id] = booking
+                }
+            }
+        }
+        return mergedById.values.sorted { $0.createdAt > $1.createdAt }
     }
 
     func updateBookingStatus(bookingId: String, status: Booking.BookingStatus) async throws {
@@ -255,8 +342,14 @@ final class FirestoreService {
         requesterRole: BookingStateMachine.Actor
     ) async throws {
         guard let booking = try await fetchBooking(bookingId: bookingId) else { return }
-        guard BookingStateMachine.callerMatches(actor: requesterRole, booking: booking, callerUid: requesterUid) else {
-            throw BookingStateMachine.TransitionError.forbidden
+        if requesterRole == .caregiver {
+            guard try await caregiverCallerMatchesBooking(callerUid: requesterUid, booking: booking) else {
+                throw BookingStateMachine.TransitionError.forbidden
+            }
+        } else {
+            guard BookingStateMachine.callerMatches(actor: requesterRole, booking: booking, callerUid: requesterUid) else {
+                throw BookingStateMachine.TransitionError.forbidden
+            }
         }
         guard BookingStateMachine.patientMayRequestCancel(status: booking.status) else { return }
 
@@ -285,8 +378,14 @@ final class FirestoreService {
         guard let booking = try await fetchBooking(bookingId: bookingId) else {
             throw BookingStateMachine.TransitionError.bookingNotFound
         }
-        guard BookingStateMachine.callerMatches(actor: actor, booking: booking, callerUid: callerUid) else {
-            throw BookingStateMachine.TransitionError.forbidden
+        if actor == .caregiver {
+            guard try await caregiverCallerMatchesBooking(callerUid: callerUid, booking: booking) else {
+                throw BookingStateMachine.TransitionError.forbidden
+            }
+        } else {
+            guard BookingStateMachine.callerMatches(actor: actor, booking: booking, callerUid: callerUid) else {
+                throw BookingStateMachine.TransitionError.forbidden
+            }
         }
         guard BookingStateMachine.canTransition(from: booking.status, to: newStatus, actor: actor) else {
             throw BookingStateMachine.TransitionError.invalidTransition(from: booking.status, to: newStatus, actor: actor)
@@ -443,13 +542,8 @@ final class FirestoreService {
     }
 
     func fetchConnectionsForCaregiver(_ caregiverId: String) async throws -> [Connection] {
-        let snapshot = try await db.collection("connections")
-            .whereField("caregiverId", isEqualTo: caregiverId)
-            .order(by: "createdAt", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: Connection.self)
+        try await fetchConnectionsForCaregiverIdentifiers(caregiverId: caregiverId) { query in
+            try await query.order(by: "createdAt", descending: true).getDocuments()
         }
     }
 
@@ -464,24 +558,18 @@ final class FirestoreService {
     }
 
     func fetchActiveConnectionsForCaregiver(_ caregiverId: String) async throws -> [Connection] {
-        let snapshot = try await db.collection("connections")
-            .whereField("caregiverId", isEqualTo: caregiverId)
-            .whereField("status", isEqualTo: Connection.ConnectionStatus.approved.rawValue)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: Connection.self)
+        try await fetchConnectionsForCaregiverIdentifiers(caregiverId: caregiverId) { query in
+            try await query
+                .whereField("status", isEqualTo: Connection.ConnectionStatus.approved.rawValue)
+                .getDocuments()
         }
     }
 
     func fetchPendingConnectionsForCaregiver(_ caregiverId: String) async throws -> [Connection] {
-        let snapshot = try await db.collection("connections")
-            .whereField("caregiverId", isEqualTo: caregiverId)
-            .whereField("status", isEqualTo: Connection.ConnectionStatus.pending.rawValue)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: Connection.self)
+        try await fetchConnectionsForCaregiverIdentifiers(caregiverId: caregiverId) { query in
+            try await query
+                .whereField("status", isEqualTo: Connection.ConnectionStatus.pending.rawValue)
+                .getDocuments()
         }
     }
 
@@ -492,13 +580,18 @@ final class FirestoreService {
     }
 
     func checkExistingConnection(userId: String, caregiverId: String) async throws -> Connection? {
-        let snapshot = try await db.collection("connections")
-            .whereField("userId", isEqualTo: userId)
-            .whereField("caregiverId", isEqualTo: caregiverId)
-            .limit(to: 1)
-            .getDocuments()
-
-        return snapshot.documents.first.flatMap { try? $0.data(as: Connection.self) }
+        let identifiers = try await caregiverIdentifiers(for: caregiverId)
+        for identifier in identifiers {
+            let snapshot = try await db.collection("connections")
+                .whereField("userId", isEqualTo: userId)
+                .whereField("caregiverId", isEqualTo: identifier)
+                .limit(to: 1)
+                .getDocuments()
+            if let decoded = snapshot.documents.first.flatMap({ try? $0.data(as: Connection.self) }) {
+                return decoded
+            }
+        }
+        return nil
     }
 
     func upsertConnectionForBooking(
@@ -723,5 +816,84 @@ final class FirestoreService {
             }
         }
         return patients
+    }
+
+    private func fetchConnectionsForCaregiverIdentifiers(
+        caregiverId: String,
+        queryBuilder: @escaping (Query) async throws -> QuerySnapshot
+    ) async throws -> [Connection] {
+        let identifiers = try await caregiverIdentifiers(for: caregiverId)
+        var caregiverNames: Set<String> = []
+        if let caregiverProfile = try? await fetchCaregiverByUserId(caregiverId),
+           !caregiverProfile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            caregiverNames.insert(caregiverProfile.name.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        if let profile = try? await fetchUser(caregiverId),
+           !profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            caregiverNames.insert(profile.fullName.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        let normalizedNames = Set(caregiverNames.map { CaregiverIdentityMatcher.normalizedName($0) })
+        let knownIds = Set(identifiers)
+
+        var mergedById: [String: Connection] = [:]
+        for identifier in identifiers {
+            let query = db.collection("connections").whereField("caregiverId", isEqualTo: identifier)
+            let snapshot = try await queryBuilder(query)
+            for document in snapshot.documents {
+                if let decoded = try? document.data(as: Connection.self) {
+                    mergedById[decoded.id] = decoded
+                }
+            }
+        }
+
+        if mergedById.isEmpty {
+            for name in caregiverNames {
+                let snapshot = try await queryBuilder(
+                    db.collection("connections").whereField("caregiverName", isEqualTo: name)
+                )
+                for document in snapshot.documents {
+                    if let decoded = try? document.data(as: Connection.self) {
+                        mergedById[decoded.id] = decoded
+                    }
+                }
+            }
+        }
+        if mergedById.isEmpty {
+            // Final fallback for inconsistent legacy docs: fetch all and filter in memory.
+            let allSnapshot = try await db.collection("connections").getDocuments()
+            for document in allSnapshot.documents {
+                guard let connection = try? document.data(as: Connection.self) else { continue }
+                if CaregiverIdentityMatcher.matches(
+                    caregiverId: connection.caregiverId,
+                    caregiverName: connection.caregiverName,
+                    knownIds: knownIds,
+                    knownNames: normalizedNames
+                ) {
+                    mergedById[connection.id] = connection
+                }
+            }
+        }
+
+        return mergedById.values.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private func caregiverIdentifiers(for caregiverId: String) async throws -> [String] {
+        var identifiers: [String] = [caregiverId]
+        if let caregiverProfile = try? await fetchCaregiverByUserId(caregiverId),
+           !caregiverProfile.id.isEmpty,
+           caregiverProfile.id != caregiverId {
+            identifiers.append(caregiverProfile.id)
+        }
+        return Array(Set(identifiers))
+    }
+
+    private func caregiverCallerMatchesBooking(callerUid: String, booking: Booking) async throws -> Bool {
+        if booking.caregiverId == callerUid {
+            return true
+        }
+        if let caregiverProfile = try? await fetchCaregiverByUserId(callerUid) {
+            return caregiverProfile.id == booking.caregiverId || caregiverProfile.userId == booking.caregiverId
+        }
+        return false
     }
 }

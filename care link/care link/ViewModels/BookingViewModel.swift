@@ -54,13 +54,14 @@ final class BookingViewModel {
     ) -> Booking {
         let bookingId = "bk_\(UUID().uuidString.prefix(8).lowercased())"
         let addr = patientAddress.trimmingCharacters(in: .whitespaces)
+        let resolvedCaregiverId = caregiver.userId.isEmpty ? caregiver.id : caregiver.userId
         return Booking(
             id: bookingId,
             userId: userId,
             patientName: patientName,
             careRecipientId: careRecipientId,
             careRecipientRelation: careRecipientRelation,
-            caregiverId: caregiver.id,
+            caregiverId: resolvedCaregiverId,
             caregiverName: caregiver.name,
             caregiverSpecialty: caregiver.specialty,
             caregiverImageURL: caregiver.imageURL,
@@ -137,7 +138,7 @@ final class BookingViewModel {
             try? await firestoreService.createNotification(
                 CLNotification(
                     id: UUID().uuidString,
-                    userId: caregiver.userId,
+                    userId: caregiver.userId.isEmpty ? caregiver.id : caregiver.userId,
                     senderUserId: userId,
                     title: "New booking request",
                     message: "\(patientName) requested care on \(booking.date.formatted(date: .abbreviated, time: .omitted)).",
@@ -163,7 +164,7 @@ final class BookingViewModel {
             let conversation = try await chatService.getOrCreateConversation(
                 userId: userId,
                 userName: patientName,
-                caregiverId: caregiver.id,
+                caregiverId: caregiver.userId.isEmpty ? caregiver.id : caregiver.userId,
                 caregiverName: caregiver.name,
                 caregiverSpecialty: caregiver.specialty
             )

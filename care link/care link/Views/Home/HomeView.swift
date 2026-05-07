@@ -938,7 +938,7 @@ struct HomeView: View {
             let conv = try? await appState.chatService.getOrCreateConversation(
                 userId: userId,
                 userName: userName,
-                caregiverId: caregiver.id,
+                caregiverId: caregiver.userId.isEmpty ? caregiver.id : caregiver.userId,
                 caregiverName: caregiver.name,
                 caregiverSpecialty: caregiver.specialty
             )
@@ -954,7 +954,7 @@ struct HomeView: View {
             let conv = try? await appState.chatService.getOrCreateConversation(
                 userId: userId,
                 userName: userName,
-                caregiverId: caregiver.id,
+                caregiverId: caregiver.userId.isEmpty ? caregiver.id : caregiver.userId,
                 caregiverName: caregiver.name,
                 caregiverSpecialty: caregiver.specialty
             )

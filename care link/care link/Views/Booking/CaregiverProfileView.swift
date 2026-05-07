@@ -67,7 +67,7 @@ struct CaregiverProfileView: View {
         async let reviewsTask = appState.firestoreService.fetchReviews(for: caregiver.id)
         async let connectionTask = appState.firestoreService.checkExistingConnection(
             userId: userId,
-            caregiverId: caregiver.id
+            caregiverId: caregiver.userId
         )
         async let bookingTask = appState.firestoreService.fetchBookings(for: userId)
 
@@ -399,7 +399,7 @@ struct CaregiverProfileView: View {
                 id: UUID().uuidString,
                 userId: userId,
                 userName: userName,
-                caregiverId: caregiver.id,
+                caregiverId: caregiver.userId,
                 caregiverName: caregiver.name,
                 caregiverSpecialty: caregiver.specialty,
                 status: .pending,
@@ -434,7 +434,7 @@ struct CaregiverProfileView: View {
             let conversation = try? await appState.chatService.getOrCreateConversation(
                 userId: userId,
                 userName: userName,
-                caregiverId: caregiver.id,
+                caregiverId: caregiver.userId.isEmpty ? caregiver.id : caregiver.userId,
                 caregiverName: caregiver.name,
                 caregiverSpecialty: caregiver.specialty
             )

@@ -393,6 +393,7 @@ struct NewUserSetupView: View {
                         appState.needsCaregiverRegistration = true
                     }
                     appState.startChatListener()
+                    appState.startNotificationsListener()
                 }
             } catch {
                 await MainActor.run {

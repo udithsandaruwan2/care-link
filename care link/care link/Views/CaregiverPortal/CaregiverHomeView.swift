@@ -331,12 +331,33 @@ struct CaregiverHomeView: View {
         bookings = (try? await bookingsTask) ?? []
         activePatientSelection = try? await activeSelectionTask
 
-        // Do NOT auto-select a patient from open bookings. Caregiver must explicitly
-        // set an active patient via the dashboard. This prevents accidental fallback
-        // to the first open booking and matches the new semantics.
+        // If nothing is selected yet but caregiver has open/approved work, keep home/dashboard in sync.
+        if activePatientSelection == nil,
+           let fallbackBooking = bookings.first(where: { openCareStatuses.contains($0.status) }) {
+            let fallbackPatientId = fallbackBooking.careRecipientId ?? fallbackBooking.userId
+            let fallbackPatientName = fallbackBooking.patientName.isEmpty ? "Patient" : fallbackBooking.patientName
+            if !fallbackPatientId.isEmpty {
+                activePatientSelection = CaregiverActivePatientSelection(
+                    patientId: fallbackPatientId,
+                    patientName: fallbackPatientName,
+                    updatedAt: Date()
+                )
+                try? await appState.firestoreService.setActivePatientForCaregiver(
+                    caregiverId: caregiverId,
+                    patientId: fallbackPatientId,
+                    patientName: fallbackPatientName
+                )
+            }
+        }
 
         if let patientId = activePatientSelection?.patientId {
             activePatientProfile = try? await appState.firestoreService.fetchUser(patientId)
+            if activePatientProfile == nil,
+               let fallbackBooking = bookings.first(where: {
+                   ($0.userId == patientId || $0.careRecipientId == patientId) && openCareStatuses.contains($0.status)
+               }) {
+                activePatientProfile = try? await appState.firestoreService.fetchUser(fallbackBooking.userId)
+            }
         } else {
             activePatientProfile = nil
         }

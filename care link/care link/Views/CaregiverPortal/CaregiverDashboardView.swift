@@ -23,6 +23,25 @@ struct CaregiverDashboardView: View {
     @State private var dashboardActionError: String?
     @State private var showPatientProfile = false
 
+    private struct BookingPatientFallback: Identifiable {
+        let id: String
+        let displayName: String
+        let booking: Booking
+    }
+
+    private var bookingPatientFallbacks: [BookingPatientFallback] {
+        var seen: Set<String> = []
+        var items: [BookingPatientFallback] = []
+        for booking in viewModel.appointments where booking.status != .cancelled {
+            let key = booking.userId
+            guard !key.isEmpty, !seen.contains(key) else { continue }
+            seen.insert(key)
+            let name = booking.patientName.isEmpty ? "Patient" : booking.patientName
+            items.append(.init(id: key, displayName: name, booking: booking))
+        }
+        return items.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -403,18 +422,29 @@ struct CaregiverDashboardView: View {
                 .padding(.horizontal, CLTheme.spacingMD)
 
             if connectedPatients.isEmpty {
-                HStack {
-                    Spacer()
-                    VStack(spacing: CLTheme.spacingSM) {
-                        Image(systemName: "person.crop.circle.badge.questionmark")
-                            .font(.system(size: 36))
-                            .foregroundStyle(CLTheme.textTertiary)
-                        Text("No patients yet")
-                            .font(CLTheme.bodyFont)
-                            .foregroundStyle(CLTheme.textSecondary)
+                if bookingPatientFallbacks.isEmpty {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: CLTheme.spacingSM) {
+                            Image(systemName: "person.crop.circle.badge.questionmark")
+                                .font(.system(size: 36))
+                                .foregroundStyle(CLTheme.textTertiary)
+                            Text("No patients yet")
+                                .font(CLTheme.bodyFont)
+                                .foregroundStyle(CLTheme.textSecondary)
+                        }
+                        .padding(.vertical, CLTheme.spacingLG)
+                        Spacer()
                     }
-                    .padding(.vertical, CLTheme.spacingLG)
-                    Spacer()
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: CLTheme.spacingMD) {
+                            ForEach(bookingPatientFallbacks) { fallback in
+                                fallbackPatientCard(fallback)
+                            }
+                        }
+                        .padding(.horizontal, CLTheme.spacingMD)
+                    }
                 }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -472,6 +502,22 @@ struct CaregiverDashboardView: View {
                 }
 
                 Button {
+                    featuredPatientProfile = patient
+                    featuredBooking = viewModel.appointments.first(where: {
+                        ($0.userId == patient.id || $0.careRecipientId == patient.id) &&
+                        ($0.status == .confirmed || $0.status == .inProgress || $0.status.needsCaregiverAction)
+                    })
+                    showPatientProfile = true
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(CLTheme.primaryNavy)
+                        .frame(width: 36, height: 36)
+                        .background(CLTheme.lightBlue)
+                        .clipShape(Circle())
+                }
+
+                Button {
                     Task { await setActivePatient(patient) }
                 } label: {
                     Image(systemName: activePatientId == patient.id ? "checkmark.seal.fill" : "scope")
@@ -485,6 +531,71 @@ struct CaregiverDashboardView: View {
             }
         }
         .frame(width: 130)
+        .padding(CLTheme.spacingMD)
+        .background(CLTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
+        .shadow(color: CLTheme.shadowLight, radius: 4)
+    }
+
+    private func fallbackPatientCard(_ fallback: BookingPatientFallback) -> some View {
+        VStack(spacing: CLTheme.spacingMD) {
+            Circle()
+                .fill(CLTheme.primaryNavy.opacity(0.12))
+                .frame(width: 56, height: 56)
+                .overlay {
+                    Text(String(fallback.displayName.prefix(2)).uppercased())
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(CLTheme.primaryNavy)
+                }
+
+            Text(fallback.displayName)
+                .font(CLTheme.calloutFont)
+                .foregroundStyle(CLTheme.textPrimary)
+                .lineLimit(1)
+
+            HStack(spacing: CLTheme.spacingSM) {
+                Button {
+                    openChatForBookingPatient(fallback.booking)
+                } label: {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(CLTheme.accentBlue)
+                        .frame(width: 36, height: 36)
+                        .background(CLTheme.lightBlue)
+                        .clipShape(Circle())
+                }
+
+                Button {
+                    selectedPatientId = fallback.id
+                    selectedPatientName = fallback.displayName
+                    openAddMedicalRecordMode = false
+                    showMedicalRecords = true
+                } label: {
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(CLTheme.tealAccent)
+                        .frame(width: 36, height: 36)
+                        .background(CLTheme.tealAccent.opacity(0.12))
+                        .clipShape(Circle())
+                }
+
+                Button {
+                    selectedPatientId = fallback.id
+                    selectedPatientName = fallback.displayName
+                    featuredBooking = fallback.booking
+                    featuredPatientProfile = nil
+                    showPatientProfile = true
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 14))
+                        .foregroundStyle(CLTheme.primaryNavy)
+                        .frame(width: 36, height: 36)
+                        .background(CLTheme.lightBlue)
+                        .clipShape(Circle())
+                }
+            }
+        }
+        .frame(width: 150)
         .padding(CLTheme.spacingMD)
         .background(CLTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: CLTheme.cornerRadiusLG))
@@ -634,7 +745,14 @@ struct CaregiverDashboardView: View {
                         .accessibilityHint(String(localized: "Rejects this patient's booking request"))
                         .accessibilityAddTraits(.isButton)
                         Button {
-                            Task { await viewModel.acceptBooking(bookingId: booking.id, caregiverUid: caregiverUid, firestoreService: appState.firestoreService) }
+                            Task {
+                                await viewModel.acceptBooking(
+                                    bookingId: booking.id,
+                                    caregiverUid: caregiverUid,
+                                    firestoreService: appState.firestoreService
+                                )
+                                await loadDashboardData()
+                            }
                         } label: {
                             Text("Accept")
                                 .font(CLTheme.calloutFont)
@@ -798,7 +916,7 @@ struct CaregiverDashboardView: View {
             firestoreService: appState.firestoreService,
             riskService: appState.coreMLBookingRiskService
         )
-        connectedPatients = (try? await appState.firestoreService.fetchConnectedPatients(caregiverId: caregiverId)) ?? []
+        connectedPatients = await resolvedConnectedPatients(caregiverId: caregiverId)
         pendingConnections = (try? await appState.firestoreService.fetchPendingConnectionsForCaregiver(caregiverId)) ?? []
         activePatientId = try? await appState.firestoreService
             .fetchActivePatientForCaregiver(caregiverId: caregiverId)?
@@ -809,6 +927,30 @@ struct CaregiverDashboardView: View {
         } else {
             featuredPatientProfile = nil
         }
+    }
+
+    private func resolvedConnectedPatients(caregiverId: String) async -> [CLUser] {
+        var mergedById: [String: CLUser] = [:]
+
+        let fromConnections = (try? await appState.firestoreService.fetchConnectedPatients(caregiverId: caregiverId)) ?? []
+        for patient in fromConnections {
+            mergedById[patient.id] = patient
+        }
+
+        // Booking approval may arrive before connection records are visible; include booking-based patients too.
+        let bookingPatientIds = Set(
+            viewModel.appointments
+                .filter { $0.status != .cancelled }
+                .map { $0.userId }
+                .filter { !$0.isEmpty }
+        )
+        for patientId in bookingPatientIds where mergedById[patientId] == nil {
+            if let user = try? await appState.firestoreService.fetchUser(patientId) {
+                mergedById[patientId] = user
+            }
+        }
+
+        return mergedById.values.sorted { $0.fullName.localizedCaseInsensitiveCompare($1.fullName) == .orderedAscending }
     }
 
     private func riskColor(_ level: BookingRiskAssessment.Level) -> Color {
