@@ -12,6 +12,12 @@ struct BookingDetailsView: View {
     @State private var familyMembers: [FamilyMember] = []
     @State private var selectedRecipientId = "self"
     @State private var showInternetAlert = false
+    @State private var showPaymentPortal = false
+    @State private var availableCards: [PaymentCard] = []
+    @State private var selectedCardId = ""
+    @State private var isProcessingCardPayment = false
+    @State private var paymentStatusMessage: String?
+    private let paymentCardStore = PaymentCardStore()
 
     private var hasBlockingBooking: Bool {
         bookingHistory.contains(where: { $0.status.blocksNewBookingRequest })
@@ -93,6 +99,9 @@ struct BookingDetailsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Please turn on internet to continue this action.")
+        }
+        .sheet(isPresented: $showPaymentPortal) {
+            paymentPortalSheet
         }
     }
 
@@ -430,37 +439,13 @@ struct BookingDetailsView: View {
                         showInternetAlert = true
                         return
                     }
-                    let userId = appState.authService.currentUser?.uid ?? ""
-                    guard !userId.isEmpty else { return }
-                    let patientName = selectedRecipientName
-                    let patientAddress = appState.authService.userProfile?.address ?? ""
-                    viewModel.updateRiskAssessment(
-                        caregiver: caregiver,
-                        userId: userId,
-                        patientName: patientName,
-                        patientAddress: patientAddress,
-                        careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
-                        careRecipientRelation: selectedFamilyMember?.relation,
-                        userHistory: bookingHistory,
-                        riskService: appState.coreMLBookingRiskService
-                    )
-                    let success = await viewModel.confirmBooking(
-                        caregiver: caregiver,
-                        userId: userId,
-                        patientName: patientName,
-                        patientAddress: patientAddress,
-                        careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
-                        careRecipientRelation: selectedFamilyMember?.relation,
-                        firestoreService: appState.firestoreService,
-                        chatService: appState.chatService
-                    )
-                    if success {
-                        appState.notificationService.scheduleLocalNotification(
-                            title: "Booking Request Sent",
-                            body: "Your request to \(caregiver.name) has been submitted."
-                        )
-                        showConfirmation = true
+                    if viewModel.selectedPaymentMethod == .card {
+                        loadPaymentCards()
+                        paymentStatusMessage = nil
+                        showPaymentPortal = true
+                        return
                     }
+                    _ = await submitBookingRequest()
                 }
             }
             .disabled(hasBlockingBooking || viewModel.isLoading)
@@ -475,6 +460,157 @@ struct BookingDetailsView: View {
         .padding(.horizontal, CLTheme.spacingLG)
         .padding(.top, CLTheme.spacingMD)
         .padding(.bottom, CLTheme.spacingSM)
+    }
+
+    private var paymentPortalSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: CLTheme.spacingMD) {
+                Text("Payment Portal")
+                    .font(CLTheme.titleFont)
+                    .foregroundStyle(CLTheme.textPrimary)
+                Text("Choose a card to pay $\(String(format: "%.2f", viewModel.estimatedTotal(for: caregiver))).")
+                    .font(CLTheme.bodyFont)
+                    .foregroundStyle(CLTheme.textSecondary)
+
+                if availableCards.isEmpty {
+                    CLCard {
+                        Text("No cards found. Add a card in Profile > Payment Methods.")
+                            .font(CLTheme.calloutFont)
+                            .foregroundStyle(CLTheme.textSecondary)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: CLTheme.spacingSM) {
+                            ForEach(availableCards) { card in
+                                paymentCardRow(card)
+                            }
+                        }
+                    }
+                }
+
+                if let paymentStatusMessage {
+                    Text(paymentStatusMessage)
+                        .font(CLTheme.calloutFont)
+                        .foregroundStyle(CLTheme.accentBlue)
+                }
+
+                CLButton(
+                    title: isProcessingCardPayment ? "Paying..." : "Pay Now",
+                    icon: "lock.fill",
+                    isLoading: isProcessingCardPayment,
+                    accessibilityHintText: String(localized: "Pays with the selected card and submits the booking request")
+                ) {
+                    guard !isProcessingCardPayment, !selectedCardId.isEmpty else { return }
+                    Task {
+                        isProcessingCardPayment = true
+                        paymentStatusMessage = "Paying securely..."
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        let success = await submitBookingRequest()
+                        if success {
+                            paymentStatusMessage = "Payment successful."
+                            showPaymentPortal = false
+                        } else {
+                            paymentStatusMessage = "Payment could not be completed."
+                        }
+                        isProcessingCardPayment = false
+                    }
+                }
+                .disabled(selectedCardId.isEmpty || isProcessingCardPayment || availableCards.isEmpty)
+            }
+            .padding(CLTheme.spacingMD)
+            .navigationTitle("Card Payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Close") {
+                        showPaymentPortal = false
+                    }
+                    .disabled(isProcessingCardPayment)
+                }
+            }
+        }
+    }
+
+    private func paymentCardRow(_ card: PaymentCard) -> some View {
+        let isSelected = selectedCardId == card.id
+        return Button {
+            selectedCardId = card.id
+        } label: {
+            HStack(spacing: CLTheme.spacingSM) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? CLTheme.accentBlue : CLTheme.textTertiary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(card.brand) \(card.maskedNumber)")
+                        .font(CLTheme.calloutFont.weight(.semibold))
+                        .foregroundStyle(CLTheme.textPrimary)
+                    Text("Expires \(card.expiryMonth)/\(card.expiryYear)")
+                        .font(CLTheme.captionFont)
+                        .foregroundStyle(CLTheme.textSecondary)
+                }
+                Spacer()
+                if card.isPrimary {
+                    Text("Primary")
+                        .font(CLTheme.smallFont)
+                        .foregroundStyle(CLTheme.accentBlue)
+                }
+            }
+            .padding(CLTheme.spacingMD)
+            .background(CLTheme.cardBackground)
+            .clipShape(CLTheme.continuousRect(cornerRadius: CLTheme.cornerRadiusMD))
+            .overlay {
+                RoundedRectangle(cornerRadius: CLTheme.cornerRadiusMD)
+                    .stroke(isSelected ? CLTheme.accentBlue : CLTheme.divider, lineWidth: isSelected ? 2 : 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(card.brand) ending in \(card.last4)")
+        .accessibilityValue(isSelected ? String(localized: "Selected") : String(localized: "Not selected"))
+    }
+
+    private func loadPaymentCards() {
+        let userId = appState.authService.currentUser?.uid ?? ""
+        availableCards = paymentCardStore.loadCards(for: userId)
+        if let primary = availableCards.first(where: { $0.isPrimary }) {
+            selectedCardId = primary.id
+        } else {
+            selectedCardId = availableCards.first?.id ?? ""
+        }
+    }
+
+    @discardableResult
+    private func submitBookingRequest() async -> Bool {
+        let userId = appState.authService.currentUser?.uid ?? ""
+        guard !userId.isEmpty else { return false }
+        let patientName = selectedRecipientName
+        let patientAddress = appState.authService.userProfile?.address ?? ""
+        viewModel.updateRiskAssessment(
+            caregiver: caregiver,
+            userId: userId,
+            patientName: patientName,
+            patientAddress: patientAddress,
+            careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
+            careRecipientRelation: selectedFamilyMember?.relation,
+            userHistory: bookingHistory,
+            riskService: appState.coreMLBookingRiskService
+        )
+        let success = await viewModel.confirmBooking(
+            caregiver: caregiver,
+            userId: userId,
+            patientName: patientName,
+            patientAddress: patientAddress,
+            careRecipientId: selectedRecipientId == "self" ? nil : selectedRecipientId,
+            careRecipientRelation: selectedFamilyMember?.relation,
+            firestoreService: appState.firestoreService,
+            chatService: appState.chatService
+        )
+        if success {
+            appState.notificationService.scheduleLocalNotification(
+                title: "Booking Request Sent",
+                body: "Your request to \(caregiver.name) has been submitted."
+            )
+            showConfirmation = true
+        }
+        return success
     }
 
     private func loadRiskContext() async {

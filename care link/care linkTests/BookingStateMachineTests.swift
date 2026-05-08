@@ -67,6 +67,39 @@ final class BookingStateMachineTests: XCTestCase {
         XCTAssertNil(BookingStateMachine.connectionStatusAfterTransition(from: .confirmed, to: .confirmed, actor: .caregiver))
     }
 
+    func testPatientCannotAdvanceWorkflowStates() {
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .awaitingCaregiver, to: .confirmed, actor: .patient))
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .pending, to: .confirmed, actor: .patient))
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .confirmed, to: .inProgress, actor: .patient))
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .inProgress, to: .completed, actor: .patient))
+    }
+
+    func testCaregiverCannotReopenOrSkipFromTerminalStates() {
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .completed, to: .inProgress, actor: .caregiver))
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .cancelled, to: .confirmed, actor: .caregiver))
+        XCTAssertFalse(BookingStateMachine.canTransition(from: .cancelled, to: .inProgress, actor: .caregiver))
+    }
+
+    func testConnectionStatusForPatientCancellation() {
+        XCTAssertEqual(
+            BookingStateMachine.connectionStatusAfterTransition(from: .confirmed, to: .cancelled, actor: .patient),
+            .rejected
+        )
+        XCTAssertEqual(
+            BookingStateMachine.connectionStatusAfterTransition(from: .inProgress, to: .cancelled, actor: .patient),
+            .rejected
+        )
+    }
+
+    func testConnectionStatusForCompletedIsNil() {
+        XCTAssertNil(
+            BookingStateMachine.connectionStatusAfterTransition(from: .inProgress, to: .completed, actor: .caregiver)
+        )
+        XCTAssertNil(
+            BookingStateMachine.connectionStatusAfterTransition(from: .confirmed, to: .completed, actor: .caregiver)
+        )
+    }
+
     func testCallerMatches() {
         let b = Booking(
             id: "1",

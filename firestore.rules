@@ -183,17 +183,25 @@ service cloud.firestore {
         get(/databases/$(database)/documents/familyMembers/$(pid)).data.ownerUserId == request.auth.uid;
     }
 
+    function isCaregiverUser() {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "caregiver";
+    }
+
     match /medicalRecords/{recordId} {
       allow read: if signedIn() && (
         isMedicalRecordPatientOwner() ||
         isMedicalRecordFamilyMemberOwner() ||
-        resource.data.caregiverId == request.auth.uid
+        resource.data.caregiverId == request.auth.uid ||
+        isCaregiverUser()
       );
 
       allow create: if signedIn() &&
         (requestMedicalRecordPatientOwner() ||
          requestMedicalRecordFamilyMemberOwner() ||
-         request.resource.data.caregiverId == request.auth.uid);
+         request.resource.data.caregiverId == request.auth.uid ||
+         isCaregiverUser());
 
       allow update, delete: if signedIn() &&
         (isMedicalRecordPatientOwner() ||

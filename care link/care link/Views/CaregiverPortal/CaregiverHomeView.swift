@@ -13,6 +13,9 @@ struct CaregiverHomeView: View {
     @State private var activePatientProfile: CLUser?
     @State private var selectedProfileBooking: Booking?
     @State private var showMedicalRecords = false
+    @State private var selectedMedicalPatientId = ""
+    @State private var selectedMedicalPatientName = ""
+    @State private var openAddMedicalRecordMode = false
     @State private var showPatientProfile = false
     @State private var showChat = false
     @State private var chatConversation: ChatConversation?
@@ -67,14 +70,12 @@ struct CaregiverHomeView: View {
                     .environment(appState)
             }
             .navigationDestination(isPresented: $showMedicalRecords) {
-                if let profile = activePatientProfile {
-                    MedicalRecordsView(
-                        patientId: profile.id,
-                        patientName: profile.fullName,
-                        startInAddMode: false
-                    )
-                    .environment(appState)
-                }
+                MedicalRecordsView(
+                    patientId: selectedMedicalPatientId,
+                    patientName: selectedMedicalPatientName,
+                    startInAddMode: openAddMedicalRecordMode
+                )
+                .environment(appState)
             }
             .navigationDestination(isPresented: $showPatientProfile) {
                 PatientProfileView(patient: activePatientProfile, booking: selectedProfileBooking ?? activePatientBooking)
@@ -197,20 +198,31 @@ struct CaregiverHomeView: View {
                             .buttonStyle(.plain)
                         }
 
-                        if activePatientProfile != nil {
-                            Button {
-                                showMedicalRecords = true
-                            } label: {
-                                Label("Records", systemImage: "doc.text.fill")
-                                    .font(CLTheme.calloutFont)
-                                    .foregroundStyle(CLTheme.primaryNavy)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(CLTheme.lightBlue)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
+                        Button {
+                            openMedicalRecordsForActiveBooking(booking, startInAddMode: false)
+                        } label: {
+                            Label("Records", systemImage: "doc.text.fill")
+                                .font(CLTheme.calloutFont)
+                                .foregroundStyle(CLTheme.primaryNavy)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(CLTheme.lightBlue)
+                                .clipShape(Capsule())
                         }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            openMedicalRecordsForActiveBooking(booking, startInAddMode: true)
+                        } label: {
+                            Label("Add record", systemImage: "plus.circle.fill")
+                                .font(CLTheme.calloutFont)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(CLTheme.accentBlue)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
 
                         Button {
                             selectedProfileBooking = booking
@@ -405,6 +417,16 @@ struct CaregiverHomeView: View {
             .replacingOccurrences(of: ")", with: "")
         guard !cleaned.isEmpty else { return nil }
         return URL(string: "tel:\(cleaned)")
+    }
+
+    private func openMedicalRecordsForActiveBooking(_ booking: Booking, startInAddMode: Bool) {
+        let patientId = booking.careRecipientId ?? booking.userId
+        guard !patientId.isEmpty else { return }
+        let fallbackName = booking.patientName.isEmpty ? "Patient" : booking.patientName
+        selectedMedicalPatientId = patientId
+        selectedMedicalPatientName = activePatientProfile?.fullName ?? fallbackName
+        openAddMedicalRecordMode = startInAddMode
+        showMedicalRecords = true
     }
 
     private func syncMainTabBarVisibility() {

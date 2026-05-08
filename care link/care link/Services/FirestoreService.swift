@@ -119,13 +119,21 @@ final class FirestoreService {
     }
 
     func fetchBookings(for userId: String) async throws -> [Booking] {
-        let snapshot = try await db.collection("bookings")
+        let baseQuery = db.collection("bookings")
             .whereField("userId", isEqualTo: userId)
-            .order(by: "createdAt", descending: true)
-            .getDocuments()
-
-        return snapshot.documents.compactMap { doc in
-            try? doc.data(as: Booking.self)
+        do {
+            let snapshot = try await baseQuery
+                .order(by: "createdAt", descending: true)
+                .getDocuments()
+            return snapshot.documents.compactMap { doc in
+                try? doc.data(as: Booking.self)
+            }
+        } catch {
+            // Fallback for projects missing the composite index required by ordered query.
+            let snapshot = try await baseQuery.getDocuments()
+            return snapshot.documents
+                .compactMap { try? $0.data(as: Booking.self) }
+                .sorted { $0.createdAt > $1.createdAt }
         }
     }
 
@@ -657,7 +665,29 @@ final class FirestoreService {
 
     /// Caregiver-facing patient chart should show all records for that patient, not only records created by current caregiver.
     func fetchMedicalRecordsForCaregiverPatient(_ patientId: String) async throws -> [MedicalRecord] {
-        try await fetchMedicalRecordsForPatient(patientId)
+        do {
+            return try await fetchMedicalRecordsForPatient(patientId)
+        } catch {
+            // Rules fallback: if patient-wide read is restricted, at least return
+            // records authored by the signed-in caregiver for this patient.
+            guard let caregiverUid = Auth.auth().currentUser?.uid, !caregiverUid.isEmpty else {
+                throw error
+            }
+            let baseQuery = db.collection("medicalRecords")
+                .whereField("patientId", isEqualTo: patientId)
+                .whereField("caregiverId", isEqualTo: caregiverUid)
+            do {
+                let snapshot = try await baseQuery
+                    .order(by: "date", descending: true)
+                    .getDocuments()
+                return snapshot.documents.compactMap { try? $0.data(as: MedicalRecord.self) }
+            } catch {
+                let fallback = try await baseQuery.getDocuments()
+                return fallback.documents
+                    .compactMap { try? $0.data(as: MedicalRecord.self) }
+                    .sorted { $0.date > $1.date }
+            }
+        }
     }
 
     // MARK: - Family Members

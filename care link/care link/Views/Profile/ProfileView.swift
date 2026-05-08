@@ -51,8 +51,13 @@ struct ProfileView: View {
                     .environment(appState)
             }
             .sheet(isPresented: $showEditProfile) {
-                EditProfileView()
-                    .environment(appState)
+                if appState.currentUserRole == .caregiver {
+                    CaregiverProfileEditView()
+                        .environment(appState)
+                } else {
+                    EditProfileView()
+                        .environment(appState)
+                }
             }
             .navigationDestination(isPresented: $showFamilyMembers) {
                 FamilyMembersView()

@@ -9,6 +9,7 @@ struct EditProfileView: View {
     @State private var phoneNumber = ""
     @State private var address = ""
     @State private var emergencyContact = ""
+    @State private var profileImageURL = ""
     @State private var isSaving = false
     @State private var showSaved = false
     @State private var showError = false
@@ -122,6 +123,14 @@ struct EditProfileView: View {
                     .tracking(1)
                 CLTextField(placeholder: "Emergency phone number", text: $emergencyContact, icon: "phone.badge.plus", keyboardType: .phonePad)
             }
+
+            VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
+                Text("PROFILE IMAGE URL")
+                    .font(CLTheme.smallFont)
+                    .foregroundStyle(CLTheme.textTertiary)
+                    .tracking(1)
+                CLTextField(placeholder: "https://...", text: $profileImageURL, icon: "photo")
+            }
         }
         .padding(CLTheme.spacingMD)
         .background(CLTheme.cardBackground)
@@ -194,6 +203,7 @@ struct EditProfileView: View {
         phoneNumber = profile.phoneNumber
         address = profile.address
         emergencyContact = profile.emergencyContact
+        profileImageURL = profile.profileImageURL
     }
 
     private func saveProfile() {
@@ -222,6 +232,7 @@ struct EditProfileView: View {
             profile.phoneNumber = cleanPhone
             profile.address = address.trimmingCharacters(in: .whitespaces)
             profile.emergencyContact = cleanEmergency
+            profile.profileImageURL = profileImageURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
             do {
                 try await appState.authService.updateUserProfile(profile)

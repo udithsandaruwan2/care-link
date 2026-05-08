@@ -9,10 +9,16 @@ struct CaregiverProfileEditView: View {
     @State private var name = ""
     @State private var specialty = ""
     @State private var title = ""
+    @State private var email = ""
     @State private var phone = ""
+    @State private var address = ""
+    @State private var emergencyContact = ""
     @State private var bio = ""
     @State private var hourlyRate = ""
     @State private var experienceYears = ""
+    @State private var imageURL = ""
+    @State private var category: Caregiver.CareCategory = .all
+    @State private var availability: [String] = [""]
     @State private var skills: [String] = [""]
     @State private var education: [String] = [""]
     @State private var certifications: [String] = [""]
@@ -43,9 +49,19 @@ struct CaregiverProfileEditView: View {
                         formField("Full Name", text: $name, icon: "person")
                         formField("Professional Title", text: $title, icon: "cross.case")
                         formField("Specialty", text: $specialty, icon: "stethoscope")
+                        formField("Email", text: $email, icon: "envelope.fill", keyboard: .emailAddress)
                         formField("Hourly Rate ($)", text: $hourlyRate, icon: "dollarsign.circle", keyboard: .decimalPad)
                         formField("Experience (years)", text: $experienceYears, icon: "clock.arrow.circlepath", keyboard: .numberPad)
                         formField("Phone Number", text: $phone, icon: "phone.fill", keyboard: .phonePad)
+                        formField("Address", text: $address, icon: "house.fill")
+                        formField("Emergency Contact", text: $emergencyContact, icon: "phone.badge.plus", keyboard: .phonePad)
+                        formField("Profile Image URL", text: $imageURL, icon: "photo")
+                        Picker("Category", selection: $category) {
+                            ForEach(Caregiver.CareCategory.allCases, id: \.self) { item in
+                                Text(item.rawValue).tag(item)
+                            }
+                        }
+                        .pickerStyle(.menu)
                     }
 
                     formSection("About Me") {
@@ -84,6 +100,13 @@ struct CaregiverProfileEditView: View {
                             values: $certifications,
                             addLabel: "Add Certification",
                             placeholder: "e.g. BLS, ACLS"
+                        )
+                        dynamicRows(
+                            title: "Availability",
+                            icon: "calendar.badge.clock",
+                            values: $availability,
+                            addLabel: "Add Availability",
+                            placeholder: "e.g. Monday 9:00-17:00"
                         )
                     }
 
@@ -194,23 +217,33 @@ struct CaregiverProfileEditView: View {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanSpecialty = specialty.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanBio = bio.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanEmergencyContact = emergencyContact.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanImageURL = imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let parsedRate = Double(hourlyRate.trimmingCharacters(in: .whitespacesAndNewlines)) ?? -1
         let parsedExperience = Int(experienceYears.trimmingCharacters(in: .whitespacesAndNewlines)) ?? -1
         let cleanSkills = skills.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let cleanEducation = education.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         let cleanCertifications = certifications.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        let cleanAvailability = availability.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
 
         guard !cleanName.isEmpty else { return presentValidation("Full name is required.") }
         guard !cleanTitle.isEmpty else { return presentValidation("Professional title is required.") }
         guard !cleanSpecialty.isEmpty else { return presentValidation("Specialty is required.") }
+        guard cleanEmail.contains("@"), cleanEmail.contains(".") else { return presentValidation("Please enter a valid email.") }
         guard parsedRate >= 0 else { return presentValidation("Please enter a valid hourly rate.") }
         guard parsedExperience >= 0 else { return presentValidation("Please enter valid years of experience.") }
         guard cleanPhone.filter(\.isNumber).count >= 7 else { return presentValidation("Please enter a valid phone number.") }
+        if !cleanEmergencyContact.isEmpty, cleanEmergencyContact.filter(\.isNumber).count < 7 {
+            return presentValidation("Emergency contact number looks incomplete.")
+        }
         guard cleanBio.count >= 20 else { return presentValidation("Bio should be at least 20 characters.") }
         guard !cleanSkills.isEmpty else { return presentValidation("Add at least one skill.") }
         guard !cleanEducation.isEmpty else { return presentValidation("Add at least one education entry.") }
+        guard !cleanAvailability.isEmpty else { return presentValidation("Add at least one availability entry.") }
 
         isSaving = true
         Task {
@@ -231,14 +264,14 @@ struct CaregiverProfileEditView: View {
                 skills: cleanSkills,
                 education: cleanEducation,
                 certifications: cleanCertifications,
-                availability: existing?.availability ?? [],
-                imageURL: existing?.imageURL ?? "",
+                availability: cleanAvailability,
+                imageURL: cleanImageURL,
                 latitude: existing?.latitude ?? 0,
                 longitude: existing?.longitude ?? 0,
                 isVerified: existing?.isVerified ?? false,
-                category: existing?.category ?? .all,
+                category: category,
                 phoneNumber: cleanPhone,
-                email: appState.authService.userProfile?.email ?? ""
+                email: cleanEmail
             )
             await viewModel.updateProfile(caregiver: caregiver, firestoreService: appState.firestoreService)
             await MainActor.run {
@@ -249,6 +282,15 @@ struct CaregiverProfileEditView: View {
                     return
                 }
                 showSaved = true
+            }
+            if var user = appState.authService.userProfile {
+                user.fullName = cleanName
+                user.email = cleanEmail
+                user.phoneNumber = cleanPhone
+                user.address = cleanAddress
+                user.emergencyContact = cleanEmergencyContact
+                user.profileImageURL = cleanImageURL
+                try? await appState.authService.updateUserProfile(user)
             }
             try? await Task.sleep(for: .seconds(1.4))
             await MainActor.run {
@@ -264,7 +306,11 @@ struct CaregiverProfileEditView: View {
 
         let userProfile = appState.authService.userProfile
         name = userProfile?.fullName ?? ""
+        email = userProfile?.email ?? ""
         phone = userProfile?.phoneNumber ?? ""
+        address = userProfile?.address ?? ""
+        emergencyContact = userProfile?.emergencyContact ?? ""
+        imageURL = userProfile?.profileImageURL ?? ""
 
         if let existing = try? await appState.firestoreService.fetchCaregiverByUserId(uid) {
             await MainActor.run {
@@ -276,6 +322,10 @@ struct CaregiverProfileEditView: View {
                 hourlyRate = existing.hourlyRate > 0 ? String(format: "%.2f", existing.hourlyRate) : ""
                 experienceYears = existing.experienceYears > 0 ? "\(existing.experienceYears)" : ""
                 phone = existing.phoneNumber.isEmpty ? phone : existing.phoneNumber
+                email = existing.email.isEmpty ? email : existing.email
+                imageURL = existing.imageURL.isEmpty ? imageURL : existing.imageURL
+                category = existing.category
+                availability = existing.availability.isEmpty ? [""] : existing.availability
                 skills = existing.skills.isEmpty ? [""] : existing.skills
                 education = existing.education.isEmpty ? [""] : existing.education
                 certifications = existing.certifications.isEmpty ? [""] : existing.certifications

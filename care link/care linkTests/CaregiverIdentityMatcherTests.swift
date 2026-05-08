@@ -38,5 +38,52 @@ final class CaregiverIdentityMatcherTests: XCTestCase {
             "dr. alex"
         )
     }
+
+    func testNormalizedNameCollapsesInternalWhitespace() {
+        XCTAssertEqual(
+            CaregiverIdentityMatcher.normalizedName("Dr.   Alex   Stone"),
+            "dr. alex stone"
+        )
+    }
+
+    func testEmptyKnownSetsNeverMatch() {
+        let result = CaregiverIdentityMatcher.matches(
+            caregiverId: "uid_123",
+            caregiverName: "Dr. Alex",
+            knownIds: [],
+            knownNames: []
+        )
+        XCTAssertFalse(result)
+    }
+
+    func testCaseInsensitiveNameMatching() {
+        let result = CaregiverIdentityMatcher.matches(
+            caregiverId: "unknown",
+            caregiverName: "DR. SARAH LEE",
+            knownIds: [],
+            knownNames: [CaregiverIdentityMatcher.normalizedName("dr. sarah lee")]
+        )
+        XCTAssertTrue(result)
+    }
+
+    func testMatchesNameWithHonorificDifferences() {
+        let result = CaregiverIdentityMatcher.matches(
+            caregiverId: "unknown",
+            caregiverName: "Dr. Sarah Lee",
+            knownIds: [],
+            knownNames: [CaregiverIdentityMatcher.normalizedName("Sarah Lee")]
+        )
+        XCTAssertTrue(result)
+    }
+
+    func testMatchesNameWithSuffixDifferences() {
+        let result = CaregiverIdentityMatcher.matches(
+            caregiverId: "unknown",
+            caregiverName: "Sarah Lee MD",
+            knownIds: [],
+            knownNames: [CaregiverIdentityMatcher.normalizedName("Dr Sarah Lee")]
+        )
+        XCTAssertTrue(result)
+    }
 }
 
