@@ -13,11 +13,11 @@ final class BiometricService {
         checkAvailability()
     }
 
-    /// Checks for actual biometric capability/enrollment (not generic passcode auth).
+    /// Check unlock capability; this allows device passcode fallback on some devices/simulator states.
     func checkAvailability() {
         let context = LAContext()
         var error: NSError?
-        let canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+        let canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
         biometricType = context.biometryType
         // Keep availability true when hardware exists and is enrolled even if policy is temporarily unavailable.
         // This avoids hiding Face ID UI after transient LAContext failures.
@@ -46,15 +46,34 @@ final class BiometricService {
         let context = LAContext()
         context.localizedReason = "Unlock CareLink to protect your health information."
         context.localizedCancelTitle = "Cancel"
-        context.localizedFallbackTitle = ""
+        context.localizedFallbackTitle = "Use Passcode"
 
         do {
+            // Prefer biometric first when available.
             return try await context.evaluatePolicy(
                 .deviceOwnerAuthenticationWithBiometrics,
                 localizedReason: "Unlock CareLink to protect your health information."
             )
         } catch {
             if let laError = error as? LAError {
+                // If biometric-only auth is unavailable right now, fall back to device passcode.
+                if laError.code == .biometryLockout ||
+                    laError.code == .biometryNotAvailable ||
+                    laError.code == .biometryNotEnrolled {
+                    do {
+                        return try await context.evaluatePolicy(
+                            .deviceOwnerAuthentication,
+                            localizedReason: "Unlock CareLink to protect your health information."
+                        )
+                    } catch {
+                        if let fallbackError = error as? LAError {
+                            errorMessage = fallbackError.localizedDescription
+                        } else {
+                            errorMessage = error.localizedDescription
+                        }
+                        return false
+                    }
+                }
                 switch laError.code {
                 case .biometryLockout:
                     errorMessage = "Face ID is temporarily locked. Unlock your phone once, then try again."
