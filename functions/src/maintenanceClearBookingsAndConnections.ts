@@ -1,3 +1,5 @@
+// File responsibility: Defines maintenance clear bookings and connections logic for cloud functions.
+
 import * as admin from "firebase-admin";
 
 admin.initializeApp({ projectId: "care-plus-c135a" });

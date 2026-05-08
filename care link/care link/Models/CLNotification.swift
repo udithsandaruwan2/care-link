@@ -1,3 +1,5 @@
+// File responsibility: Defines c l notification logic for the care link app.
+
 import Foundation
 
 struct CLNotification: Identifiable, Codable, Sendable {
@@ -24,6 +26,7 @@ struct CLNotification: Identifiable, Codable, Sendable {
         case general = "general"
 
         var iconName: String {
+            // Handle each state transition explicitly.
             switch self {
             case .bookingConfirmed: return "checkmark.circle.fill"
             case .bookingRequest: return "calendar.badge.plus"
@@ -38,6 +41,7 @@ struct CLNotification: Identifiable, Codable, Sendable {
         }
 
         var colorHex: String {
+            // Handle each state transition explicitly.
             switch self {
             case .bookingConfirmed: return "16A34A"
             case .bookingRequest: return "0066CC"

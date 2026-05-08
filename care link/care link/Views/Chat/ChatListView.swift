@@ -1,3 +1,5 @@
+// File responsibility: Defines chat list view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -60,6 +62,7 @@ struct ChatListView: View {
             }
             .onChange(of: showChat) { _, _ in syncMainTabBarVisibility() }
             .onChange(of: appState.pendingPushConversationId) { _, id in
+                // Validate required values before continuing.
                 guard let id, !id.isEmpty else { return }
                 if let conv = appState.chatService.conversations.first(where: { $0.id == id }) {
                     selectedConversation = conv

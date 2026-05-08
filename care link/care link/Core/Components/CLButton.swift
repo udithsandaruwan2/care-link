@@ -1,3 +1,5 @@
+// File responsibility: Defines c l button logic for the care link app.
+
 import SwiftUI
 
 struct CLButton: View {
@@ -8,6 +10,7 @@ struct CLButton: View {
     var isLoading: Bool = false
     /// VoiceOver hint beyond the title (optional).
     var accessibilityHintText: String? = nil
+    // Use a safe fallback when data is missing.
     /// If non-nil, overrides default VoiceOver label (defaults to `title`).
     var accessibilityLabelOverride: String? = nil
     let action: () -> Void
@@ -68,6 +71,7 @@ struct CLButton: View {
 
     @ViewBuilder
     private var background: some View {
+        // Handle each state transition explicitly.
         switch style {
         case .primary:
             CLTheme.gradientBlue

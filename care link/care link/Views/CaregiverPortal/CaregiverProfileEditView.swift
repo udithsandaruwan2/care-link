@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver profile edit view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -132,6 +134,7 @@ struct CaregiverProfileEditView: View {
                 Text(errorMessage)
             }
             .onAppear {
+                // Load data asynchronously without blocking the UI.
                 Task { await loadExistingProfile() }
             }
         }
@@ -155,6 +158,7 @@ struct CaregiverProfileEditView: View {
         }
     }
 
+    // Use a safe fallback when data is missing.
     private func formField(_ placeholder: String, text: Binding<String>, icon: String, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
             Text(placeholder.uppercased())

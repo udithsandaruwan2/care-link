@@ -1,3 +1,5 @@
+// File responsibility: Defines privacy policy view logic for the care link app.
+
 import SwiftUI
 
 struct PrivacyPolicyView: View {

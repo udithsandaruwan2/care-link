@@ -1,3 +1,5 @@
+// File responsibility: Defines care_link app logic for the care link app.
+
 import SwiftUI
 
 @main

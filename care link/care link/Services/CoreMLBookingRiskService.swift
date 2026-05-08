@@ -1,3 +1,5 @@
+// File responsibility: Defines core m l booking risk service logic for the care link app.
+
 import Foundation
 
 struct BookingRiskAssessment: Sendable {
@@ -39,7 +41,9 @@ final class CoreMLBookingRiskService {
             return makeAssessment(score: clamp01(mlScore), source: "coreml")
         }
 
+        // Use a safe fallback when data is missing.
         let fallbackScore = fallbackRiskScore(features: features)
+        // Use a safe fallback when data is missing.
         return makeAssessment(score: fallbackScore, source: "fallback")
     }
 

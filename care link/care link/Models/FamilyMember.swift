@@ -1,3 +1,5 @@
+// File responsibility: Defines family member logic for the care link app.
+
 import Foundation
 
 struct FamilyMember: Identifiable, Codable, Sendable {

@@ -1,3 +1,5 @@
+// File responsibility: Defines c l tab bar logic for the care link app.
+
 import SwiftUI
 
 enum CLTab: String, CaseIterable {
@@ -8,6 +10,7 @@ enum CLTab: String, CaseIterable {
     case profile = "PROFILE"
 
     var icon: String {
+        // Handle each state transition explicitly.
         switch self {
         case .home: return "house"
         case .chat: return "bubble.left.and.bubble.right"
@@ -18,6 +21,7 @@ enum CLTab: String, CaseIterable {
     }
 
     var selectedIcon: String {
+        // Handle each state transition explicitly.
         switch self {
         case .home: return "house.fill"
         case .chat: return "bubble.left.and.bubble.right.fill"

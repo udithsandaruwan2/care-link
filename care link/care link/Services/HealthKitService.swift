@@ -1,3 +1,5 @@
+// File responsibility: Defines health kit service logic for the care link app.
+
 import Foundation
 import HealthKit
 
@@ -32,6 +34,7 @@ final class HealthKitService {
     }
 
     func requestAuthorization() async -> Bool {
+        // Validate required values before continuing.
         guard isAvailable else {
             lastErrorMessage = "Health data is not available on this iPhone."
             return false
@@ -50,6 +53,7 @@ final class HealthKitService {
 
     func refreshAuthorizationStatus() async {
         let statuses = readTypes.compactMap { type -> HKAuthorizationStatus? in
+            // Validate required values before continuing.
             guard let quantityType = type as? HKQuantityType else { return nil }
             return healthStore.authorizationStatus(for: quantityType)
         }

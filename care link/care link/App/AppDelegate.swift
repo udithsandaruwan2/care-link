@@ -1,3 +1,5 @@
+// File responsibility: Defines app delegate logic for the care link app.
+
 import UIKit
 import FirebaseCore
 import FirebaseAuth
@@ -42,8 +44,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) async {
         let userInfo = response.notification.request.content.userInfo
         let routingInfo = Self.pushRoutingUserInfo(from: userInfo)
+        // Validate required values before continuing.
         guard !routingInfo.isEmpty else { return }
         await MainActor.run {
+            // Use a safe fallback when data is missing.
             NotificationCenter.default.post(
                 name: .careLinkPushNotificationTapped,
                 object: nil,

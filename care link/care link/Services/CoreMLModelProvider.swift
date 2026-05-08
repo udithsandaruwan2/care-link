@@ -1,3 +1,5 @@
+// File responsibility: Defines core m l model provider logic for the care link app.
+
 import Foundation
 import CoreML
 
@@ -17,12 +19,14 @@ struct DefaultCoreMLModelProvider: CoreMLModelProviding {
         inputFeatures: [String: Double],
         outputKey: String
     ) -> Double? {
+        // Validate required values before continuing.
         guard let modelURL = Bundle.main.url(forResource: modelName, withExtension: "mlmodelc"),
               let model = try? MLModel(contentsOf: modelURL) else {
             return nil
         }
 
         let valueMap = inputFeatures.mapValues { MLFeatureValue(double: $0) }
+        // Validate required values before continuing.
         guard let inputProvider = try? MLDictionaryFeatureProvider(dictionary: valueMap),
               let output = try? model.prediction(from: inputProvider) else {
             return nil

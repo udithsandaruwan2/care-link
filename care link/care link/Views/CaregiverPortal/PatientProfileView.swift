@@ -1,3 +1,5 @@
+// File responsibility: Defines patient profile view logic for the care link app.
+
 import SwiftUI
 
 struct PatientProfileView: View {

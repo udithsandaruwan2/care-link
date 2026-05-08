@@ -1,3 +1,5 @@
+// File responsibility: Defines add family member view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
@@ -101,12 +103,14 @@ struct AddFamilyMemberView: View {
 
     private func saveMember() {
         let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Validate required values before continuing.
         guard !trimmed.isEmpty else {
             errorMessage = "Please enter the member name."
             showError = true
             return
         }
         let ownerId = appState.authService.currentUser?.uid ?? ""
+        // Validate required values before continuing.
         guard !ownerId.isEmpty else {
             errorMessage = "Please sign in again."
             showError = true

@@ -1,3 +1,5 @@
+// File responsibility: Defines booking rules logic for cloud functions.
+
 /**
  * Booking transition matrix shared with iOS `BookingStateMachine` in
  * `care link/care link/Models/BookingStateMachine.swift`. Update both when rules change.

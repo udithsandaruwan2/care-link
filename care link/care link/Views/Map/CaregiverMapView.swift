@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver map view logic for the care link app.
+
 import SwiftUI
 import MapKit
 import FirebaseAuth
@@ -120,6 +122,7 @@ struct CaregiverMapView: View {
                 searchDebounceTask?.cancel()
                 searchDebounceTask = Task {
                     try? await Task.sleep(for: .milliseconds(280))
+                    // Validate required values before continuing.
                     guard !Task.isCancelled else { return }
                     await MainActor.run {
                         viewModel.applySearch()
@@ -145,6 +148,7 @@ struct CaregiverMapView: View {
 
     private func mapPin(for caregiver: Caregiver) -> some View {
         Button {
+            // Validate required values before continuing.
             guard blockingActiveBooking == nil else { return }
             withAnimation(.spring(response: 0.3)) {
                 viewModel.selectCaregiver(caregiver)

@@ -1,3 +1,5 @@
+// File responsibility: Defines firestore service logic for the care link app.
+
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
@@ -93,7 +95,9 @@ final class FirestoreService {
         do {
             try await BookingFunctionsService.createBookingRequest(booking)
         } catch {
+            // Validate required values before continuing.
             guard isFunctionUnavailableError(error) else { throw error }
+            // Use a safe fallback when data is missing.
             // Dev fallback: preserve the server invariant (one blocking booking per patient).
             let existing = try await db.collection("bookings")
                 .whereField("userId", isEqualTo: booking.userId)

@@ -1,3 +1,5 @@
+// File responsibility: Defines support center view logic for the care link app.
+
 import SwiftUI
 
 struct SupportCenterView: View {
@@ -141,6 +143,7 @@ struct SupportCenterView: View {
 
     private func sendRequest() {
         let cleanMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Validate required values before continuing.
         guard !cleanMessage.isEmpty else { return }
         let subject = "CareLink Support Request"
         let body = """

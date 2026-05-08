@@ -1,3 +1,5 @@
+// File responsibility: Defines view  extensions logic for the care link app.
+
 import SwiftUI
 
 extension View {

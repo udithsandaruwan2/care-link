@@ -1,3 +1,5 @@
+// File responsibility: Defines auth service logic for the care link app.
+
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
@@ -18,6 +20,7 @@ final class AuthService {
         currentUser = Auth.auth().currentUser
         isAuthenticated = currentUser != nil
         if let uid = currentUser?.uid {
+            // Load data asynchronously without blocking the UI.
             Task { await fetchUserProfile(uid: uid) }
         }
     }
@@ -53,6 +56,7 @@ final class AuthService {
     // MARK: - Profile Management
 
     func createNewUserProfile(fullName: String, email: String, role: CLUser.UserRole) async throws {
+        // Validate required values before continuing.
         guard let user = currentUser else { return }
 
         let newUser = CLUser(

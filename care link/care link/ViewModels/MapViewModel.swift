@@ -1,3 +1,5 @@
+// File responsibility: Defines map view model logic for the care link app.
+
 import SwiftUI
 import MapKit
 

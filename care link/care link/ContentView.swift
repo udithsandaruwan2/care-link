@@ -1,3 +1,5 @@
+// File responsibility: Defines content view logic for the care link app.
+
 import SwiftUI
 import GoogleSignIn
 

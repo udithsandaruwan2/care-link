@@ -1,3 +1,5 @@
+// File responsibility: Defines booking confirmation view logic for the care link app.
+
 import SwiftUI
 
 struct BookingConfirmationView: View {
@@ -158,6 +160,7 @@ struct BookingConfirmationView: View {
                         style: addedToCalendar ? .secondary : .primary,
                         accessibilityHintText: String(localized: "Creates a calendar event for this booking")
                     ) {
+                        // Load data asynchronously without blocking the UI.
                         Task {
                             addedToCalendar = await appState.eventKitService.addBookingToCalendar(booking: booking)
                         }

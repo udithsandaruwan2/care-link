@@ -1,3 +1,5 @@
+// File responsibility: Defines booking view model logic for the care link app.
+
 import SwiftUI
 
 @Observable
@@ -28,6 +30,7 @@ final class BookingViewModel {
         let calendar = Calendar.current
         let baseStart = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: selectedDate) ?? selectedDate
 
+        // Handle each state transition explicitly.
         switch label {
         case "Morning (4h)":
             startTime = baseStart
@@ -39,6 +42,7 @@ final class BookingViewModel {
         case "Full Day (8h)":
             startTime = baseStart
             endTime = calendar.date(byAdding: .hour, value: 8, to: baseStart) ?? baseStart
+        // Use a safe fallback when data is missing.
         default:
             break
         }

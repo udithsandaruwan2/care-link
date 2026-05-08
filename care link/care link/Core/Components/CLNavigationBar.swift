@@ -1,3 +1,5 @@
+// File responsibility: Defines c l navigation bar logic for the care link app.
+
 import SwiftUI
 
 struct CLNavigationBar: View {

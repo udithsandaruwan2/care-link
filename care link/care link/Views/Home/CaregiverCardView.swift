@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver card view logic for the care link app.
+
 import SwiftUI
 
 struct CaregiverCardView: View {

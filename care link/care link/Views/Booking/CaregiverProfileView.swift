@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver profile view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -392,6 +394,7 @@ struct CaregiverProfileView: View {
 
     private func requestConnection() {
         isRequestingConnection = true
+        // Load data asynchronously without blocking the UI.
         Task {
             let userId = appState.authService.currentUser?.uid ?? ""
             let userName = appState.authService.userProfile?.fullName ?? "User"
@@ -428,6 +431,7 @@ struct CaregiverProfileView: View {
     }
 
     private func openChat() {
+        // Load data asynchronously without blocking the UI.
         Task {
             let userId = appState.authService.currentUser?.uid ?? ""
             let userName = appState.authService.userProfile?.fullName ?? "User"

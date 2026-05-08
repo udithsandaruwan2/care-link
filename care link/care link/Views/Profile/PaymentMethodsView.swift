@@ -1,3 +1,5 @@
+// File responsibility: Defines payment methods view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -115,6 +117,7 @@ struct PaymentMethodsView: View {
                         ? String(localized: "Primary card")
                         : String(localized: "Set as primary card")
                 )
+                // Use a safe fallback when data is missing.
                 .accessibilityHint(String(localized: "Uses this card as the default for bookings"))
                 .careLinkMinimumTapTarget(44)
             }

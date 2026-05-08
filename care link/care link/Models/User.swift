@@ -1,3 +1,5 @@
+// File responsibility: Defines user logic for the care link app.
+
 import Foundation
 
 struct CLUser: Identifiable, Codable, Sendable {

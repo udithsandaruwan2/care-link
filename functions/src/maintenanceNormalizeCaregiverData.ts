@@ -1,3 +1,5 @@
+// File responsibility: Defines maintenance normalize caregiver data logic for cloud functions.
+
 import * as admin from "firebase-admin";
 
 admin.initializeApp({ projectId: "care-plus-c135a" });
@@ -20,6 +22,7 @@ async function loadCaregiverMaps() {
     const profileId = doc.id;
     const userId = data.userId ?? "";
     const name = (data.name ?? "").trim();
+    // Validate required inputs before continuing.
     if (!userId) return;
     byProfileIdToUserId.set(profileId, userId);
     byUserIdToProfileId.set(userId, profileId);
@@ -80,6 +83,7 @@ async function mergeNotificationDocsForCaregivers() {
   let moved = 0;
 
   for (const [userId, profileId] of byUserIdToProfileId.entries()) {
+    // Validate required inputs before continuing.
     if (!profileId || profileId === userId) continue;
 
     const legacyRef = db.collection("users").doc(profileId).collection("notifications");

@@ -1,3 +1,5 @@
+// File responsibility: Defines booking details view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -266,6 +268,7 @@ struct BookingDetailsView: View {
                 recipientRow(
                     id: "self",
                     title: appState.authService.userProfile?.fullName ?? "Me",
+                    // Use a safe fallback when data is missing.
                     subtitle: "Account holder (default)"
                 )
                 ForEach(familyMembers) { member in
@@ -434,6 +437,7 @@ struct BookingDetailsView: View {
                 isLoading: viewModel.isLoading,
                 accessibilityHintText: String(localized: "Submits your booking request to this caregiver")
             ) {
+                // Load data asynchronously without blocking the UI.
                 Task {
                     guard appState.networkMonitor.isConnected else {
                         showInternetAlert = true

@@ -1,3 +1,5 @@
+// File responsibility: Defines network monitor service logic for the care link app.
+
 import Foundation
 import Network
 

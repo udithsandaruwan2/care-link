@@ -1,3 +1,5 @@
+// File responsibility: Defines home view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -128,7 +130,9 @@ struct HomeView: View {
             }
             .onAppear { syncMainTabBarVisibility() }
             .onAppear {
+                // Load data asynchronously without blocking the UI.
                 Task {
+                    // Validate required values before continuing.
                     guard UserDefaults.standard.bool(forKey: "carelink.healthKitSyncEnabled") else { return }
                     await appState.healthKitService.refreshMetrics()
                 }

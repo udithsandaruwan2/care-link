@@ -1,3 +1,5 @@
+// File responsibility: Defines biometric credential store logic for the care link app.
+
 import Foundation
 import Security
 
@@ -39,6 +41,7 @@ enum BiometricCredentialStore {
         add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
 
         let status = SecItemAdd(add as CFDictionary, nil)
+        // Validate required values before continuing.
         guard status == errSecSuccess else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
         }
@@ -55,6 +58,7 @@ enum BiometricCredentialStore {
         ]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
+        // Validate required values before continuing.
         guard status == errSecSuccess, let data = item as? Data,
               let payload = try? JSONDecoder().decode(Payload.self, from: data) else {
             return nil

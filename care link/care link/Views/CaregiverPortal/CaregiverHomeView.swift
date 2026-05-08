@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver home view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -90,11 +92,13 @@ struct CaregiverHomeView: View {
             .task { await loadHomeData() }
             .onAppear {
                 syncMainTabBarVisibility()
+                // Load data asynchronously without blocking the UI.
                 Task { await loadHomeData() }
             }
             .onChange(of: showDashboard) { _, _ in syncMainTabBarVisibility() }
             .onChange(of: showDashboard) { _, isShowing in
                 if !isShowing {
+                    // Load data asynchronously without blocking the UI.
                     Task { await loadHomeData() }
                 }
             }

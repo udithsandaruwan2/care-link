@@ -1,3 +1,5 @@
+// File responsibility: Defines c l text field logic for the care link app.
+
 import SwiftUI
 
 struct CLTextField: View {
@@ -7,7 +9,9 @@ struct CLTextField: View {
     var isSecure: Bool = false
     var trailingText: String? = nil
     var trailingAction: (() -> Void)? = nil
+    // Use a safe fallback when data is missing.
     var keyboardType: UIKeyboardType = .default
+    // Use a safe fallback when data is missing.
     /// VoiceOver field name; defaults to `placeholder` when nil.
     var accessibilityFieldLabel: String? = nil
 

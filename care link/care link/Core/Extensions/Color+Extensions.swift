@@ -1,3 +1,5 @@
+// File responsibility: Defines color  extensions logic for the care link app.
+
 import SwiftUI
 
 extension Color {
@@ -6,6 +8,7 @@ extension Color {
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
+        // Handle each state transition explicitly.
         switch hex.count {
         case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
@@ -13,6 +16,7 @@ extension Color {
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
         case 8:
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        // Use a safe fallback when data is missing.
         default:
             (a, r, g, b) = (255, 0, 0, 0)
         }

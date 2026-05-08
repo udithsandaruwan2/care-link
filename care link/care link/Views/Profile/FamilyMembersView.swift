@@ -1,3 +1,5 @@
+// File responsibility: Defines family members view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -163,6 +165,7 @@ struct FamilyMembersView: View {
 
     private func loadMembers() async {
         let userId = appState.authService.currentUser?.uid ?? ""
+        // Validate required values before continuing.
         guard !userId.isEmpty else { return }
         isLoading = true
         defer { isLoading = false }

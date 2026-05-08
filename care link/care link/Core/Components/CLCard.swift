@@ -1,3 +1,5 @@
+// File responsibility: Defines c l card logic for the care link app.
+
 import SwiftUI
 
 struct CLCard<Content: View>: View {

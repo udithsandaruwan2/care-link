@@ -1,3 +1,5 @@
+// File responsibility: Defines booking rules.test logic for cloud functions.
+
 import assert from "node:assert/strict";
 import { BLOCKING_CREATE, canTransition, connectionStatusForTransition, STATUS } from "./bookingRules";
 

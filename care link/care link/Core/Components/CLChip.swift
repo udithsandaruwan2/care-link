@@ -1,3 +1,5 @@
+// File responsibility: Defines c l chip logic for the care link app.
+
 import SwiftUI
 
 struct CLChip: View {

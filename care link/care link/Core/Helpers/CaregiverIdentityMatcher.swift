@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver identity matcher logic for the care link app.
+
 import Foundation
 
 enum CaregiverIdentityMatcher {
@@ -29,6 +31,7 @@ enum CaregiverIdentityMatcher {
     private static func namesAreEquivalent(_ lhs: String, _ rhs: String) -> Bool {
         let left = canonicalName(lhs)
         let right = canonicalName(rhs)
+        // Validate required values before continuing.
         guard !left.isEmpty, !right.isEmpty else { return false }
         if left == right { return true }
         // Allow "john doe" to match "dr john doe" / "john doe md" style variants.
@@ -45,6 +48,7 @@ enum CaregiverIdentityMatcher {
             return true
         }
         let normalized = normalizedName(caregiverName)
+        // Validate required values before continuing.
         guard !normalized.isEmpty else { return false }
         if knownNames.contains(normalized) { return true }
         return knownNames.contains { namesAreEquivalent($0, normalized) }

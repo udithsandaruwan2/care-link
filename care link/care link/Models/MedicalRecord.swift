@@ -1,3 +1,5 @@
+// File responsibility: Defines medical record logic for the care link app.
+
 import Foundation
 
 struct MedicalRecord: Identifiable, Codable, Sendable {
@@ -22,6 +24,7 @@ struct MedicalRecord: Identifiable, Codable, Sendable {
         case procedure = "Procedure"
 
         var iconName: String {
+            // Handle each state transition explicitly.
             switch self {
             case .vitals: return "heart.text.clipboard.fill"
             case .medication: return "pills.fill"
@@ -33,6 +36,7 @@ struct MedicalRecord: Identifiable, Codable, Sendable {
         }
 
         var colorHex: String {
+            // Handle each state transition explicitly.
             switch self {
             case .vitals: return "DC2626"
             case .medication: return "0066CC"

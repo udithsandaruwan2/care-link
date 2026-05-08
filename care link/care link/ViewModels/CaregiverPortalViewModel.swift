@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver portal view model logic for the care link app.
+
 import SwiftUI
 
 @Observable

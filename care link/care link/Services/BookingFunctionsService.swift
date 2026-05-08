@@ -1,3 +1,5 @@
+// File responsibility: Defines booking functions service logic for the care link app.
+
 import Foundation
 import FirebaseFirestore
 import FirebaseFunctions
@@ -6,6 +8,7 @@ enum BookingFunctionsError: LocalizedError {
     case functionUnavailable(String)
 
     var errorDescription: String? {
+        // Handle each state transition explicitly.
         switch self {
         case .functionUnavailable(let detail):
             return detail
@@ -15,6 +18,7 @@ enum BookingFunctionsError: LocalizedError {
 
 /// Server-authoritative booking create and status updates via Cloud Functions.
 enum BookingFunctionsService {
+    // Use a safe fallback when data is missing.
     /// Try default + common regions so app keeps working if function region drifts.
     private static let functionClients: [Functions] = [
         Functions.functions(),

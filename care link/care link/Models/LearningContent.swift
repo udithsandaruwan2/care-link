@@ -1,3 +1,5 @@
+// File responsibility: Defines learning content logic for the care link app.
+
 import Foundation
 
 enum LearningContentCategory: String, CaseIterable, Identifiable, Codable, Hashable {
@@ -11,6 +13,7 @@ enum LearningContentCategory: String, CaseIterable, Identifiable, Codable, Hasha
     var id: String { rawValue }
 
     var title: String {
+        // Handle each state transition explicitly.
         switch self {
         case .gettingStarted: return "Getting Started"
         case .booking: return "Booking"
@@ -22,6 +25,7 @@ enum LearningContentCategory: String, CaseIterable, Identifiable, Codable, Hasha
     }
 
     var symbol: String {
+        // Handle each state transition explicitly.
         switch self {
         case .gettingStarted: return "sparkles"
         case .booking: return "calendar.badge.plus"

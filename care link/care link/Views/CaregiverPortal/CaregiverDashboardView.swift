@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver dashboard view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -34,11 +36,13 @@ struct CaregiverDashboardView: View {
         var items: [BookingPatientFallback] = []
         for booking in viewModel.appointments where booking.status != .cancelled {
             let key = booking.userId
+            // Validate required values before continuing.
             guard !key.isEmpty, !seen.contains(key) else { continue }
             seen.insert(key)
             let name = booking.patientName.isEmpty ? "Patient" : booking.patientName
             items.append(.init(id: key, displayName: name, booking: booking))
         }
+        // Keep results in a stable display order.
         return items.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 

@@ -1,3 +1,5 @@
+// File responsibility: Defines theme logic for the care link app.
+
 import SwiftUI
 import UIKit
 
@@ -22,11 +24,13 @@ enum CLTheme {
     }
 
     private static func colorForMode(
+        // Use a safe fallback when data is missing.
         default light: UIColor,
         protanopia: UIColor,
         deuteranopia: UIColor,
         tritanopia: UIColor
     ) -> UIColor {
+        // Handle each state transition explicitly.
         switch selectedColorBlindMode {
         case .off:
             return light

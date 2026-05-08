@@ -1,3 +1,5 @@
+// File responsibility: Defines connection requests view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -124,6 +126,7 @@ struct ConnectionRequestsView: View {
 
                 HStack(spacing: CLTheme.spacingMD) {
                     Button {
+                        // Load data asynchronously without blocking the UI.
                         Task { await rejectConnection(connection) }
                     } label: {
                         Text("Decline")
@@ -137,6 +140,7 @@ struct ConnectionRequestsView: View {
                     .buttonStyle(.plain)
 
                     Button {
+                        // Load data asynchronously without blocking the UI.
                         Task { await approveConnection(connection) }
                     } label: {
                         Text("Approve")

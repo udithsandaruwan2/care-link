@@ -1,3 +1,5 @@
+// File responsibility: Defines my care hub view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -134,6 +136,7 @@ struct MyCareHubView: View {
 
                 if BookingStateMachine.patientMayRequestCancel(status: booking.status) {
                     Button {
+                        // Load data asynchronously without blocking the UI.
                         Task {
                             do {
                                 try await appState.firestoreService.requestBookingCancellation(

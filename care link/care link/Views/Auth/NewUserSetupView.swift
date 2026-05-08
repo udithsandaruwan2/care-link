@@ -1,3 +1,5 @@
+// File responsibility: Defines new user setup view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -301,6 +303,7 @@ struct NewUserSetupView: View {
 
             Button {
                 if currentStep < totalSteps - 1 {
+                    // Validate required values before continuing.
                     guard validateCurrentStep() else { return }
                     withAnimation { currentStep += 1 }
                 } else {
@@ -355,6 +358,7 @@ struct NewUserSetupView: View {
     }
 
     private func saveProfile() {
+        // Validate required values before continuing.
         guard validateCurrentStep() else { return }
         isSaving = true
 

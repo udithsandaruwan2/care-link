@@ -1,3 +1,5 @@
+// File responsibility: Defines add medical record view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -157,8 +159,10 @@ struct AddMedicalRecordView: View {
 
     private func saveRecord() {
         isSaving = true
+        // Load data asynchronously without blocking the UI.
         Task {
             let caregiverId = appState.authService.currentUser?.uid ?? ""
+            // Validate required values before continuing.
             guard !caregiverId.isEmpty else {
                 await MainActor.run {
                     isSaving = false

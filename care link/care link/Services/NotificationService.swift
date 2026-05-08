@@ -1,3 +1,5 @@
+// File responsibility: Defines notification service logic for the care link app.
+
 import Foundation
 import UserNotifications
 
@@ -21,6 +23,7 @@ final class NotificationService {
         let content = UNMutableNotificationContent()
         content.title = "Upcoming Appointment"
         content.body = "Your appointment with \(booking.caregiverName) is in 1 hour."
+        // Use a safe fallback when data is missing.
         content.sound = .default
 
         let reminderDate = booking.startTime.addingTimeInterval(-3600)
@@ -40,6 +43,7 @@ final class NotificationService {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
+        // Use a safe fallback when data is missing.
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(timeInterval, 1), repeats: false)

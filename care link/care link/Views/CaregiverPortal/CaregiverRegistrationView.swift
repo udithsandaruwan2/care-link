@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver registration view logic for the care link app.
+
 import SwiftUI
 import MapKit
 import FirebaseAuth
@@ -397,6 +399,7 @@ struct CaregiverRegistrationView: View {
         .padding(.horizontal, CLTheme.spacingMD)
     }
 
+    // Use a safe fallback when data is missing.
     private func formField(_ placeholder: String, text: Binding<String>, icon: String, keyboard: UIKeyboardType = .default) -> some View {
         VStack(alignment: .leading, spacing: CLTheme.spacingXS) {
             Text(placeholder.uppercased())
@@ -409,6 +412,7 @@ struct CaregiverRegistrationView: View {
 
     private func saveProfile() {
         isSaving = true
+        // Load data asynchronously without blocking the UI.
         Task {
             let uid = appState.authService.currentUser?.uid ?? UUID().uuidString
             let caregiver = Caregiver(

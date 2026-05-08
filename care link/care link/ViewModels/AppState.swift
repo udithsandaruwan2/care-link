@@ -1,3 +1,5 @@
+// File responsibility: Defines app state logic for the care link app.
+
 import SwiftUI
 import CoreData
 import FirebaseAuth
@@ -18,6 +20,7 @@ private final class PushNotificationObserver: NSObject {
         let bookingId = AppState.pushRouteValue(from: note.userInfo, key: "bookingId")
         let conversationId = AppState.pushRouteValue(from: note.userInfo, key: "conversationId")
 
+        // Load data asynchronously without blocking the UI.
         Task { @MainActor [weak appState, bookingId, conversationId] in
             appState?.applyPushRouting(bookingId: bookingId, conversationId: conversationId)
         }
@@ -67,6 +70,7 @@ final class AppState {
     init() {
         let observer = PushNotificationObserver(appState: self)
         pushObserver = observer
+        // Use a safe fallback when data is missing.
         NotificationCenter.default.addObserver(
             observer,
             selector: #selector(PushNotificationObserver.handlePushNotificationTapped(_:)),

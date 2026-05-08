@@ -1,3 +1,5 @@
+// File responsibility: Defines learning center view model logic for the care link app.
+
 import SwiftUI
 
 @Observable

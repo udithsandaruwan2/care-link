@@ -1,3 +1,5 @@
+// File responsibility: Defines face i d view logic for the care link app.
+
 import SwiftUI
 
 struct FaceIDView: View {

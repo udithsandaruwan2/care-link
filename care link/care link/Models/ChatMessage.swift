@@ -1,3 +1,5 @@
+// File responsibility: Defines chat message logic for the care link app.
+
 import Foundation
 
 struct ChatConversation: Identifiable, Codable, Sendable {

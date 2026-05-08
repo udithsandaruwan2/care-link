@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver avatar logic for the care link app.
+
 import SwiftUI
 
 struct CaregiverAvatar: View {

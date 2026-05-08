@@ -1,3 +1,5 @@
+// File responsibility: Defines main tab view logic for the care link app.
+
 import SwiftUI
 
 struct MainTabView: View {
@@ -9,6 +11,7 @@ struct MainTabView: View {
     @State private var chatStackHidesTabBar = false
 
     private var showsTabBar: Bool {
+        // Handle each state transition explicitly.
         switch selectedTab {
         case .home where appState.currentUserRole == .user:
             return !homeStackHidesTabBar
@@ -16,6 +19,7 @@ struct MainTabView: View {
             return !mapStackHidesTabBar
         case .chat:
             return !chatStackHidesTabBar
+        // Use a safe fallback when data is missing.
         default:
             return true
         }

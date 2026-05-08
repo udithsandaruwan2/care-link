@@ -1,3 +1,5 @@
+// File responsibility: Defines caregiver logic for the care link app.
+
 import Foundation
 
 struct Caregiver: Identifiable, Codable, Sendable, Hashable {

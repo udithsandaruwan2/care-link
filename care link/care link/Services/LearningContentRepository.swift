@@ -1,3 +1,5 @@
+// File responsibility: Defines learning content repository logic for the care link app.
+
 import Foundation
 
 protocol LearningContentProviding {
@@ -178,6 +180,7 @@ final class LearningContentRepository: LearningContentProviding {
     }
 
     func articles(for category: LearningContentCategory?) -> [LearningArticle] {
+        // Validate required values before continuing.
         guard let category else { return articles }
         return articles.filter { $0.category == category }
     }
@@ -185,6 +188,7 @@ final class LearningContentRepository: LearningContentProviding {
     func search(query: String, category: LearningContentCategory?) -> [LearningArticle] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let scoped = articles(for: category)
+        // Validate required values before continuing.
         guard !trimmed.isEmpty else { return scoped }
 
         let lowercased = trimmed.lowercased()

@@ -1,3 +1,5 @@
+// File responsibility: Defines persistence controller logic for the care link app.
+
 import Foundation
 import CoreData
 
@@ -32,6 +34,7 @@ final class PersistenceController: @unchecked Sendable {
 
     func save() {
         let context = container.viewContext
+        // Validate required values before continuing.
         guard context.hasChanges else { return }
         do {
             try context.save()
@@ -66,6 +69,7 @@ final class PersistenceController: @unchecked Sendable {
 
     func loadCachedCaregivers() -> [Caregiver] {
         let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "CachedCaregiver")
+        // Validate required values before continuing.
         guard let results = try? container.viewContext.fetch(fetchRequest) else { return [] }
 
         return results.compactMap { obj in

@@ -1,3 +1,5 @@
+// File responsibility: Defines welcome view logic for the care link app.
+
 import SwiftUI
 
 struct WelcomeView: View {

@@ -1,3 +1,5 @@
+// File responsibility: Defines edit profile view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -198,6 +200,7 @@ struct EditProfileView: View {
     // MARK: - Logic
 
     private func loadProfile() {
+        // Validate required values before continuing.
         guard let profile = appState.authService.userProfile else { return }
         fullName = profile.fullName
         phoneNumber = profile.phoneNumber
@@ -207,6 +210,7 @@ struct EditProfileView: View {
     }
 
     private func saveProfile() {
+        // Validate required values before continuing.
         guard !fullName.trimmingCharacters(in: .whitespaces).isEmpty else {
             errorMessage = "Name cannot be empty."
             showError = true

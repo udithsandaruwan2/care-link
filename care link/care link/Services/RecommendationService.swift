@@ -1,3 +1,5 @@
+// File responsibility: Defines recommendation service logic for the care link app.
+
 import Foundation
 
 @Observable
@@ -52,6 +54,7 @@ final class RecommendationService {
         }
 
         return scored
+            // Keep results in a stable display order.
             .sorted { $0.score > $1.score }
             .map { $0.caregiver }
     }

@@ -1,3 +1,5 @@
+// File responsibility: Defines location service logic for the care link app.
+
 import Foundation
 import CoreLocation
 import MapKit
@@ -29,7 +31,9 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // Validate required values before continuing.
         guard let location = locations.last else { return }
+        // Load data asynchronously without blocking the UI.
         Task { @MainActor in
             self.userLocation = location.coordinate
         }

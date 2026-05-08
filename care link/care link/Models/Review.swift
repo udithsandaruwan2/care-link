@@ -1,3 +1,5 @@
+// File responsibility: Defines review logic for the care link app.
+
 import Foundation
 
 struct Review: Identifiable, Codable, Sendable {

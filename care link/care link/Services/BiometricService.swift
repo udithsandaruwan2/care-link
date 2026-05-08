@@ -1,3 +1,5 @@
+// File responsibility: Defines biometric service logic for the care link app.
+
 import Foundation
 import LocalAuthentication
 
@@ -11,20 +13,22 @@ final class BiometricService {
         checkAvailability()
     }
 
-    /// Uses device-owner auth so Face ID/Touch ID can fall back to device passcode when needed.
+    /// Checks for actual biometric capability/enrollment (not generic passcode auth).
     func checkAvailability() {
         let context = LAContext()
         var error: NSError?
-        let canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error)
+        let canUseBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
         biometricType = context.biometryType
         // Keep availability true when hardware exists and is enrolled even if policy is temporarily unavailable.
         // This avoids hiding Face ID UI after transient LAContext failures.
         if canUseBiometrics {
             isAvailable = true
         } else if biometricType != .none, let laError = error.flatMap({ LAError(_nsError: $0) }) {
+            // Handle each state transition explicitly.
             switch laError.code {
             case .biometryLockout, .appCancel, .systemCancel, .invalidContext, .notInteractive:
                 isAvailable = true
+            // Use a safe fallback when data is missing.
             default:
                 isAvailable = false
             }
@@ -34,13 +38,19 @@ final class BiometricService {
     }
 
     func authenticate() async -> Bool {
+        checkAvailability()
+        guard isAvailable else {
+            errorMessage = "Face ID is not available or not set up on this device."
+            return false
+        }
         let context = LAContext()
         context.localizedReason = "Unlock CareLink to protect your health information."
         context.localizedCancelTitle = "Cancel"
+        context.localizedFallbackTitle = ""
 
         do {
             return try await context.evaluatePolicy(
-                .deviceOwnerAuthentication,
+                .deviceOwnerAuthenticationWithBiometrics,
                 localizedReason: "Unlock CareLink to protect your health information."
             )
         } catch {

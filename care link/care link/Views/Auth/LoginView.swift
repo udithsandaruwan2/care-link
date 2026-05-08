@@ -1,3 +1,5 @@
+// File responsibility: Defines login view logic for the care link app.
+
 import SwiftUI
 import FirebaseCore
 import FirebaseAuth
@@ -50,6 +52,7 @@ struct LoginView: View {
         }
         .alert("Sign in faster next time?", isPresented: $showBiometricSetupAlert) {
             Button("Enable") {
+                // Load data asynchronously without blocking the UI.
                 Task {
                     await enableBiometricForNextLogin()
                     flushPostLoginIntent()
@@ -114,6 +117,7 @@ struct LoginView: View {
                     isLoading: viewModel.isLoading,
                     accessibilityHintText: String(localized: "Uses saved account credentials on this device")
                 ) {
+                    // Load data asynchronously without blocking the UI.
                     Task { await performBiometricSignIn() }
                 }
                 .padding(.horizontal, CLTheme.spacingLG)

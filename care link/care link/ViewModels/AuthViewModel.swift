@@ -1,3 +1,5 @@
+// File responsibility: Defines auth view model logic for the care link app.
+
 import SwiftUI
 
 @Observable
@@ -20,10 +22,12 @@ final class AuthViewModel {
 
     @MainActor
     func signIn(authService: AuthService) async -> SignInResult {
+        // Validate required values before continuing.
         guard !email.trimmingCharacters(in: .whitespaces).isEmpty else {
             showErrorMessage("Please enter your email address.")
             return .failed
         }
+        // Validate required values before continuing.
         guard password.count >= 6 else {
             showErrorMessage("Password must be at least 6 characters.")
             return .failed

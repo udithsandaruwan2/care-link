@@ -1,3 +1,5 @@
+// File responsibility: Defines settings view logic for the care link app.
+
 import SwiftUI
 import UserNotifications
 import UIKit
@@ -67,6 +69,7 @@ struct SettingsView: View {
                     }
 
                     Button {
+                        // Load data asynchronously without blocking the UI.
                         Task { await connectOrRefreshHealth() }
                     } label: {
                         HStack {
@@ -240,6 +243,7 @@ struct SettingsView: View {
             }
             .alert("Delete Account", isPresented: $showDeleteConfirmation) {
                 Button("Delete", role: .destructive) {
+                    // Load data asynchronously without blocking the UI.
                     Task {
                         try? await appState.authService.deleteAccount()
                         appState.signOut()

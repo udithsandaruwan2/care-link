@@ -1,3 +1,5 @@
+// File responsibility: Defines booking logic for the care link app.
+
 import Foundation
 
 struct Booking: Identifiable, Codable, Sendable {
@@ -38,6 +40,7 @@ struct Booking: Identifiable, Codable, Sendable {
         case cancelled = "Cancelled"
 
         var color: String {
+            // Handle each state transition explicitly.
             switch self {
             case .awaitingCaregiver, .pending: return "F59E0B"
             case .confirmed: return "0066CC"
@@ -72,6 +75,7 @@ struct Booking: Identifiable, Codable, Sendable {
         case cash = "Cash"
 
         var iconName: String {
+            // Handle each state transition explicitly.
             switch self {
             case .card: return "creditcard.fill"
             case .cash: return "banknote.fill"

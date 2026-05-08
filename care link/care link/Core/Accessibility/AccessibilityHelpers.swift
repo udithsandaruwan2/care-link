@@ -1,8 +1,11 @@
+// File responsibility: Defines accessibility helpers logic for the care link app.
+
 import SwiftUI
 
 // MARK: - Environment
 
 private struct ReduceMotionKey: EnvironmentKey {
+    // Use a safe fallback when data is missing.
     static let defaultValue: Bool = false
 }
 

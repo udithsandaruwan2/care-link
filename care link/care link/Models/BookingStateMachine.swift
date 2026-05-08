@@ -1,3 +1,5 @@
+// File responsibility: Defines booking state machine logic for the care link app.
+
 import Foundation
 
 /// Single place for booking lifecycle rules (patient vs caregiver) and how they map to `connections`.
@@ -14,6 +16,7 @@ enum BookingStateMachine: Sendable {
         case invalidTransition(from: Booking.BookingStatus, to: Booking.BookingStatus, actor: Actor)
 
         var errorDescription: String? {
+            // Handle each state transition explicitly.
             switch self {
             case .bookingNotFound:
                 return "Booking could not be found."
@@ -21,6 +24,7 @@ enum BookingStateMachine: Sendable {
                 return "You are not allowed to change this booking."
             case .invalidTransition(let from, let to, let actor):
                 let actorLabel: String
+                // Handle each state transition explicitly.
                 switch actor {
                 case .patient: actorLabel = "patient"
                 case .caregiver: actorLabel = "caregiver"

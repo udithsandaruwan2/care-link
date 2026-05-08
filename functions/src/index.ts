@@ -1,3 +1,5 @@
+// File responsibility: Defines index logic for cloud functions.
+
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -23,6 +25,7 @@ function timestampFromUnknown(raw: unknown): admin.firestore.Timestamp | null {
       return admin.firestore.Timestamp.fromMillis(asNumber);
     }
     const parsed = Date.parse(raw);
+    // Validate required inputs before continuing.
     if (!Number.isNaN(parsed)) {
       return admin.firestore.Timestamp.fromMillis(parsed);
     }
@@ -36,6 +39,7 @@ function normalizeBookingPayloadForFirestore(
   const normalized: Record<string, unknown> = { ...booking };
   const dateKeys = ["date", "startTime", "endTime", "createdAt", "cancellationRequestedAt"];
   for (const key of dateKeys) {
+    // Validate required inputs before continuing.
     if (!(key in normalized)) continue;
     const ts = timestampFromUnknown(normalized[key]);
     if (ts) normalized[key] = ts;

@@ -1,3 +1,5 @@
+// File responsibility: Defines bookings list view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -8,6 +10,7 @@ struct BookingsListView: View {
     @State private var isLoading = true
 
     var filteredBookings: [Booking] {
+        // Validate required values before continuing.
         guard let filter = selectedFilter else { return bookings }
         return bookings.filter { $0.status == filter }
     }
@@ -129,6 +132,7 @@ struct BookingsListView: View {
                 if BookingStateMachine.patientMayRequestCancel(status: booking.status) {
                     let patientUid = appState.authService.currentUser?.uid ?? ""
                     Button {
+                        // Load data asynchronously without blocking the UI.
                         Task {
                             do {
                                 let updated = try await appState.firestoreService.applyBookingTransition(

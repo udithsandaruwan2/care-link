@@ -1,3 +1,5 @@
+// File responsibility: Defines alerts view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -15,8 +17,10 @@ struct AlertsView: View {
                     if appState.notificationService.unreadCount > 0 {
                         Button {
                             appState.notificationService.markAllAsRead()
+                            // Load data asynchronously without blocking the UI.
                             Task {
                                 let uid = appState.authService.currentUser?.uid ?? ""
+                                // Validate required values before continuing.
                                 guard !uid.isEmpty else { return }
                                 try? await appState.firestoreService.markAllNotificationsRead(userId: uid)
                             }

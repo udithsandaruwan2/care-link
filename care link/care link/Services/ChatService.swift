@@ -1,3 +1,5 @@
+// File responsibility: Defines chat service logic for the care link app.
+
 import Foundation
 import FirebaseFirestore
 
@@ -28,6 +30,7 @@ final class ChatService {
         conversationListener = baseQuery
             .order(by: "lastMessageAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, error in
+                // Validate required values before continuing.
                 guard let self else { return }
                 if let snapshot {
                     self.conversations = snapshot.documents.compactMap { doc in
@@ -35,6 +38,7 @@ final class ChatService {
                     }
                     return
                 }
+                // Use a safe fallback when data is missing.
                 // If Firestore cannot serve the ordered query (e.g. missing index), fallback to base query
                 // and sort locally so chat keeps working in real-time.
                 if error != nil {

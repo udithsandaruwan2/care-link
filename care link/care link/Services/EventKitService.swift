@@ -1,3 +1,5 @@
+// File responsibility: Defines event kit service logic for the care link app.
+
 import Foundation
 import EventKit
 
@@ -17,8 +19,10 @@ final class EventKitService {
     }
 
     func addBookingToCalendar(booking: Booking) async -> Bool {
+        // Validate required values before continuing.
         guard isAuthorized else {
             await requestAccess()
+            // Validate required values before continuing.
             guard isAuthorized else { return false }
             return await addBookingToCalendar(booking: booking)
         }

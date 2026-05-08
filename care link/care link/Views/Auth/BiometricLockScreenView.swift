@@ -1,3 +1,5 @@
+// File responsibility: Defines biometric lock screen view logic for the care link app.
+
 import SwiftUI
 
 /// Full-screen gate shown when the app was backgrounded and the user has Face ID / Touch ID enabled.
@@ -31,6 +33,7 @@ struct BiometricLockScreenView: View {
                 }
 
                 CLButton(title: "Unlock with \(appState.biometricService.unlockButtonLabel)", icon: appState.biometricService.biometricIcon) {
+                    // Load data asynchronously without blocking the UI.
                     Task { await appState.unlockAppWithBiometrics() }
                 }
                 .padding(.horizontal, CLTheme.spacingLG)
@@ -57,6 +60,7 @@ struct BiometricLockScreenView: View {
             isMatching = false
         }
         .onAppear {
+            // Validate required values before continuing.
             guard !reduceMotion else {
                 pulse = true
                 return

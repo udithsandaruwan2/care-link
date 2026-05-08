@@ -1,3 +1,5 @@
+// File responsibility: Defines onboarding view logic for the care link app.
+
 import SwiftUI
 
 struct OnboardingView: View {

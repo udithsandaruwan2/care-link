@@ -1,3 +1,5 @@
+// File responsibility: Defines core m l recommendation service logic for the care link app.
+
 import Foundation
 
 struct CaregiverRecommendationContext {
@@ -9,12 +11,14 @@ struct CaregiverRecommendationContext {
 @Observable
 final class CoreMLRecommendationService {
     private let modelProvider: CoreMLModelProviding
+    // Use a safe fallback when data is missing.
     private let fallbackService: RecommendationService
     private let modelName = "CaregiverRecommender"
     private let outputKey = "score"
 
     init(
         modelProvider: CoreMLModelProviding = DefaultCoreMLModelProvider(),
+        // Use a safe fallback when data is missing.
         fallbackService: RecommendationService = RecommendationService()
     ) {
         self.modelProvider = modelProvider

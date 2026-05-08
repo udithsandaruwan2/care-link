@@ -1,3 +1,5 @@
+// File responsibility: Defines chat detail view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -53,6 +55,7 @@ struct ChatDetailView: View {
         .navigationBarHidden(true)
         .onAppear {
             appState.chatService.listenToMessages(conversationId: conversation.id)
+            // Load data asynchronously without blocking the UI.
             Task {
                 await appState.chatService.markMessagesAsRead(
                     conversationId: conversation.id,
@@ -67,6 +70,7 @@ struct ChatDetailView: View {
 
     @ViewBuilder
     private func messageRow(_ message: ChatMessage) -> some View {
+        // Handle each state transition explicitly.
         switch message.kind {
         case .bookingRequest:
             bookingRequestRow(message)

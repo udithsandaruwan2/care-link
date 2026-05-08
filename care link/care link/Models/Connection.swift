@@ -1,3 +1,5 @@
+// File responsibility: Defines connection logic for the care link app.
+
 import Foundation
 
 struct Connection: Identifiable, Codable, Sendable {
@@ -16,6 +18,7 @@ struct Connection: Identifiable, Codable, Sendable {
         case rejected = "rejected"
 
         var displayName: String {
+            // Handle each state transition explicitly.
             switch self {
             case .pending: return "Pending"
             case .approved: return "Connected"
@@ -24,6 +27,7 @@ struct Connection: Identifiable, Codable, Sendable {
         }
 
         var colorHex: String {
+            // Handle each state transition explicitly.
             switch self {
             case .pending: return "F59E0B"
             case .approved: return "16A34A"

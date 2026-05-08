@@ -1,3 +1,5 @@
+// File responsibility: Defines medical records view logic for the care link app.
+
 import SwiftUI
 import FirebaseAuth
 
@@ -20,6 +22,7 @@ struct MedicalRecordsView: View {
     }
 
     private var filteredRecords: [MedicalRecord] {
+        // Validate required values before continuing.
         guard let type = selectedType else { return records }
         return records.filter { $0.recordType == type }
     }
@@ -47,6 +50,7 @@ struct MedicalRecordsView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, CLTheme.spacingXL)
                     Button("Try again") {
+                        // Load data asynchronously without blocking the UI.
                         Task { await loadRecords() }
                     }
                     .font(CLTheme.calloutFont.weight(.semibold))

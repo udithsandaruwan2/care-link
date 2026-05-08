@@ -1,3 +1,5 @@
+// File responsibility: Defines home view model logic for the care link app.
+
 import SwiftUI
 
 @Observable
@@ -59,6 +61,7 @@ final class HomeViewModel {
                 (rankIndexById[$0.id] ?? Int.max) < (rankIndexById[$1.id] ?? Int.max)
             }
         } else {
+            // Handle each state transition explicitly.
             switch selectedSort {
             case .recommended:
                 break

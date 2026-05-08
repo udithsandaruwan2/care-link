@@ -1,3 +1,5 @@
+// File responsibility: Defines add new card view logic for the care link app.
+
 import SwiftUI
 
 struct AddNewCardView: View {
@@ -94,6 +96,7 @@ struct AddNewCardView: View {
 
     private func masked(_ raw: String) -> String {
         let digits = raw.filter(\.isNumber)
+        // Validate required values before continuing.
         guard !digits.isEmpty else { return "•••• •••• •••• ••••" }
         let chunks = stride(from: 0, to: digits.count, by: 4).map { start in
             let end = min(start + 4, digits.count)
