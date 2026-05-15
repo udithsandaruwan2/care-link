@@ -1,5 +1,7 @@
 # CareLink
 
+- **Student Index**: COBSCCOMP242P-027
+
 **Your Digital Health Sanctuary** — An iOS application connecting users with trusted caregivers for elderly care, childcare, and home assistance.
 
 ## Architecture
